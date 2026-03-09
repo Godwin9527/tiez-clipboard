@@ -1,0 +1,537 @@
+/* Settings Panel */
+.settings-view {
+  background: transparent;
+  padding: 12px 8px;
+  max-width: 420px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.settings-group {
+  border: 2px solid var(--border-dark);
+  background: var(--bg-element);
+  margin: 0;
+  box-shadow: 2px 2px 0 0 var(--shadow-color);
+  border-radius: 4px;
+  overflow: visible !important;
+  position: relative;
+}
+
+.group-header {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.settings-group.collapsed {
+  /* No specialCollapsed style needed if it's just a header row now */
+  padding-bottom: 0;
+}
+
+/* Expanded State: Retro Tag Style */
+.settings-group:not(.collapsed) {
+  padding: 12px;
+  position: relative;
+  /* Ensure absolute header is relative to this */
+}
+
+.settings-group:not(.collapsed) .group-header {
+  /* Hide the row-style header when expanded, or style it differently */
+  /* Actually, to match "original style", header was part of container */
+  /* We need to make the H3 pop out again */
+  padding: 0;
+  background: transparent;
+  pointer-events: none;
+  /* Let clicks pass through if needed, though we usually click header to toggle */
+  height: 0;
+  /* Effectively hide the bar, but keep element for logic? No, we need toggle. */
+  /* Better approach: Styled H3 absolutely, chevron absolutely */
+}
+
+/* Let's be precise: User wants "Regular Settings >" when collapsed (list style) */
+/* And "Box with Label on Top" when expanded (retro style) */
+
+/* Common H3 resets */
+.settings-group h3 {
+  transition: all 0.2s;
+}
+
+/* Collapsed: List Style */
+.settings-group.collapsed .group-header {
+  padding: 12px;
+  background: var(--bg-button);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.settings-group.collapsed h3 {
+  position: static;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Expanded: keep header position consistent */
+.settings-group:not(.collapsed) .group-header {
+  padding: 12px;
+  background: var(--bg-button);
+  height: auto;
+  margin-bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: static;
+  pointer-events: auto;
+}
+
+.settings-group:not(.collapsed) .group-header svg {
+  display: inline-block;
+}
+
+.settings-group:not(.collapsed) h3 {
+  position: static;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.settings-group:not(.collapsed) .group-content {
+  border-top: none;
+  padding: 0;
+  background: transparent;
+}
+
+.settings-inline-note {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  opacity: 0.85;
+}
+
+.setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  /* Align to center for better dense layout */
+  padding: 6px 0;
+  /* Reduced padding for denser layout */
+  border-bottom: 2px solid rgba(0, 0, 0, 0.05);
+  min-height: 34px;
+  /* Reduced minimum height */
+}
+
+.setting-item.column {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 6px 0;
+  /* Match regular setting-item padding */
+}
+
+.setting-item .hint {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  font-weight: normal;
+  display: block;
+  margin-top: 2px;
+}
+
+.hint-icon-btn {
+  width: 18px;
+  height: 18px;
+  padding: 2px;
+  background: transparent;
+  border: none;
+  box-shadow: none !important;
+  color: #ff9800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.setting-item.no-border {
+  border-bottom: none !important;
+  padding-bottom: 0;
+  /* Remove bottom padding for last item */
+}
+
+.item-label-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-right: 8px;
+}
+
+.setting-item span.item-label {
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: var(--font-size-md);
+  display: block;
+  /* Flex settings to align with switch */
+  display: flex;
+  align-items: center;
+  /* min-height: 32px; Removed to allow denser layout */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Recessed Data Panel (for paths/status) */
+.data-panel {
+  background: var(--bg-body);
+  color: var(--text-primary);
+  font-family: var(--font-mono) !important;
+  font-weight: bold;
+  padding: 8px 12px;
+  border: 2px solid var(--border-dark);
+  box-shadow: inset 3px 3px 0 rgba(0, 0, 0, 0.05);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.data-panel:hover {
+  background: #ffffff;
+}
+
+.setting-item .switch {
+  margin-left: 12px;
+  flex-shrink: 0;
+  /* Prevent switch from shrinking */
+}
+
+/* Range Slider (Retro / Default Theme) */
+.settings-view input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 10px;
+  background:
+    linear-gradient(var(--accent-color), var(--accent-color)) 0/ var(--range-progress, 0%) 100% no-repeat,
+    var(--bg-body);
+  border: 2px solid var(--border-dark);
+  border-radius: 6px;
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.08);
+  outline: none;
+}
+
+.settings-view input[type="range"]::-webkit-slider-runnable-track {
+  height: 10px;
+  background: transparent;
+}
+
+.settings-view input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -5px;
+  background: var(--bg-element);
+  border: 2px solid var(--border-dark);
+  border-radius: 4px;
+  box-shadow: 0 2px 0 var(--border-dark);
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.settings-view input[type="range"]:active::-webkit-slider-thumb {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 var(--border-dark);
+}
+
+.settings-view input[type="range"]::-moz-range-track {
+  height: 10px;
+  background: var(--bg-body);
+  border: 2px solid var(--border-dark);
+  border-radius: 6px;
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.08);
+}
+
+.settings-view input[type="range"]::-moz-range-progress {
+  height: 10px;
+  background: var(--accent-color);
+  border-radius: 6px;
+}
+
+.settings-view input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--bg-element);
+  border: 2px solid var(--border-dark);
+  border-radius: 4px;
+  box-shadow: 0 2px 0 var(--border-dark);
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.settings-view input[type="range"]::-moz-range-thumb:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 var(--border-dark);
+}
+
+.settings-view input[type="range"]:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+/* From Uiverse.io by r7chardgh */
+/* The switch - the box around the slider */
+.switch {
+  font-size: 12px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 64px;
+  height: 32px;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+/* Hide default HTML checkbox */
+.switch .cb {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/* The slider */
+.toggle {
+  position: absolute;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+  background-color: var(--border-dark);
+  border-radius: 0.1em;
+  transition: 0.4s;
+  text-transform: uppercase;
+  font-weight: 700;
+  overflow: hidden;
+  box-shadow: -0.3em 0 0 0 var(--border-dark), -0.3em 0.3em 0 0 var(--border-dark),
+    0.3em 0 0 0 var(--border-dark), 0.3em 0.3em 0 0 var(--border-dark), 0 0.3em 0 0 var(--border-dark);
+}
+
+.toggle>.left {
+  position: absolute;
+  display: flex;
+  width: 50%;
+  height: 88%;
+  background-color: var(--bg-element);
+  color: var(--text-primary);
+  left: 0;
+  bottom: 0;
+  align-items: center;
+  justify-content: center;
+  transform-origin: right;
+  transform: rotateX(10deg);
+  transform-style: preserve-3d;
+  transition: all 150ms;
+  font-size: 0.65em;
+  font-weight: 900;
+}
+
+.toggle>.left::before {
+  position: absolute;
+  content: "OFF";
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  z-index: 1;
+}
+
+.toggle>.left::after {
+  position: absolute;
+  content: "";
+  width: 100%;
+  height: 100%;
+  background-color: var(--text-secondary);
+  opacity: 0.2;
+  transform-origin: center left;
+  transform: rotateY(90deg);
+  z-index: -1;
+}
+
+.toggle>.right {
+  position: absolute;
+  display: flex;
+  width: 50%;
+  height: 88%;
+  background-color: var(--bg-element);
+  color: var(--text-muted);
+  right: 1px;
+  bottom: 0;
+  align-items: center;
+  justify-content: center;
+  transform-origin: left;
+  transform: rotateX(10deg) rotateY(-45deg);
+  transform-style: preserve-3d;
+  transition: all 150ms;
+  font-size: 0.65em;
+  font-weight: 900;
+}
+
+.toggle>.right::before {
+  position: absolute;
+  content: "ON";
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  z-index: 1;
+}
+
+.toggle>.right::after {
+  position: absolute;
+  content: "";
+  width: 100%;
+  height: 100%;
+  background-color: rgb(206, 206, 206);
+  transform-origin: center right;
+  transform: rotateY(-90deg);
+  z-index: -1;
+}
+
+.switch input:checked+.toggle>.left {
+  transform: rotateX(10deg) rotateY(45deg);
+  color: var(--text-muted);
+}
+
+.switch input:checked+.toggle>.right {
+  transform: rotateX(10deg) rotateY(0deg);
+  color: #487bdb;
+}
+
+/* Hotkey Button Style */
+.key-group {
+  display: flex;
+  gap: 6px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background 0.2s;
+  margin-top: 4px;
+  /* Align with label */
+}
+
+/* Removed hover background */
+/* .key-group:hover { background: rgba(0,0,0,0.05); } */
+
+.key-group.recording {
+  /* Optional: visual cue for recording state without background box */
+  opacity: 0.8;
+}
+
+/* Switch-themed Industrial Style */
+.key-cap {
+  position: relative;
+  min-width: 2.2em;
+  height: 2.2em;
+  padding: 0 0.5em;
+  margin: 0 3px;
+
+  /* Match switch toggle light color */
+  background-color: var(--bg-element);
+  color: var(--text-primary);
+
+  /* Match switch base color */
+  border: 2px solid var(--border-dark);
+  border-bottom-width: 5px;
+  /* Physical thickness */
+  border-radius: 4px;
+
+  transition: all 0.1s;
+  cursor: pointer;
+
+  /* Flexbox */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* Text */
+  font-family: inherit;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 11px;
+}
+
+/* Remove pseudo elements */
+.key-cap::before,
+.key-cap::after {
+  content: none;
+}
+
+/* Active State */
+.key-group:active .key-cap,
+.key-group.recording .key-cap {
+  transform: translateY(3px);
+  /* Press down */
+  border-bottom-width: 2px;
+  /* Reduce thickness */
+  background-color: var(--bg-button);
+}
+
+.key-group:active .key-cap::before,
+.key-group.recording .key-cap::before {
+  content: none;
+}
+
+.key-group:active .key-cap::after,
+.key-group.recording .key-cap::after {
+  content: none;
+}
+
+/* Segmented Control - Industrial Style */
+.segmented-control {
+  display: flex;
+  background: var(--bg-body);
+  border: 2px solid var(--border-dark);
+  padding: 2px;
+  border-radius: 4px;
+  gap: 2px;
+  box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.segment-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.2s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.segment-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-primary);
+}
+
+.segment-btn.active {
+  background: var(--text-primary);
+  color: var(--bg-window);
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.2);
+}
