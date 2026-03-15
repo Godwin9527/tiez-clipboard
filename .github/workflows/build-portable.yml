@@ -1,0 +1,45 @@
+name: Build Portable
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build portable
+        run: npx tauri build --no-bundle --features portable
+
+      - name: Package portable
+        shell: pwsh
+        run: |
+          $out = "artifacts/portable"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          Copy-Item "src-tauri/target/release/tiez-app.exe" -Destination "$out/tiez-app.exe"
+          Compress-Archive -Path "$out/tiez-app.exe" -DestinationPath "$out/TieZ-Portable.zip" -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TieZ-Portable
+          path: artifacts/portable/TieZ-Portable.zip
