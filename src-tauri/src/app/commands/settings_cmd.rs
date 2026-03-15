@@ -175,6 +175,85 @@ pub fn set_search_hotkey(
 }
 
 #[tauri::command]
+pub fn set_scroll_top_hotkey(
+    app_handle: AppHandle,
+    state: State<'_, SettingsState>,
+    hotkey: String,
+) -> AppResult<()> {
+    if let Ok(mut guard) = state.scroll_top_hotkey.lock() {
+        *guard = hotkey.clone();
+    }
+
+    // Update low-level hook hotkey (not global shortcut, so other apps can use the key)
+    let parsed = if hotkey.is_empty() {
+        None
+    } else {
+        crate::app::hooks::parse_hotkey_for_hook(&hotkey)
+    };
+    *crate::global_state::SCROLL_TOP_HOTKEY.lock().unwrap() = parsed;
+
+    let db_state = app_handle.state::<DbState>();
+    db_state.settings_repo.set("app.scroll_top_hotkey", &hotkey).map_err(AppError::from)
+}
+
+#[tauri::command]
+pub fn set_emoji_panel_hotkey(
+    app_handle: AppHandle,
+    state: State<'_, SettingsState>,
+    hotkey: String,
+) -> AppResult<()> {
+    use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+
+    let _ = app_handle.global_shortcut().unregister_all();
+
+    if let Ok(mut guard) = state.emoji_panel_hotkey.lock() {
+        *guard = hotkey.clone();
+    }
+
+    if !hotkey.is_empty() {
+        let normalized = hotkey.replace("Win", "Super");
+        if let Ok(shortcut) = normalized.parse::<Shortcut>() {
+            let _ = app_handle.global_shortcut().register(shortcut);
+        }
+    }
+
+    // Re-register all other hotkeys
+    let main_hotkey = { let db = app_handle.state::<DbState>(); db.settings_repo.get("app.hotkey").unwrap_or(Some("Alt+C".to_string())).unwrap_or("Alt+C".to_string()) };
+    if !is_win_v_hotkey(&main_hotkey) { if let Ok(s) = main_hotkey.replace("Win", "Super").parse::<Shortcut>() { let _ = app_handle.global_shortcut().register(s); } }
+    for key in [&state.sequential_paste_hotkey, &state.rich_paste_hotkey, &state.search_hotkey] {
+        let val = key.lock().unwrap().clone();
+        if !val.is_empty() { if let Ok(s) = val.replace("Win", "Super").parse::<Shortcut>() { let _ = app_handle.global_shortcut().register(s); } }
+    }
+
+    let db_state = app_handle.state::<DbState>();
+    db_state.settings_repo.set("app.emoji_panel_hotkey", &hotkey).map_err(AppError::from)
+}
+
+#[tauri::command]
+pub fn set_quick_paste_nav_mode(
+    app_handle: AppHandle,
+    state: State<'_, SettingsState>,
+    mode: String,
+) -> AppResult<()> {
+    use crate::global_state::QUICK_PASTE_NAV_MODE;
+
+    let nav_val = match mode.as_str() {
+        "wheel" => 1u8,
+        "arrow" => 2,
+        "both" => 3,
+        _ => 0, // "off"
+    };
+    QUICK_PASTE_NAV_MODE.store(nav_val, std::sync::atomic::Ordering::Relaxed);
+
+    if let Ok(mut guard) = state.quick_paste_nav_mode.lock() {
+        *guard = mode.clone();
+    }
+
+    let db_state = app_handle.state::<DbState>();
+    db_state.settings_repo.set("app.quick_paste_nav_mode", &mode).map_err(AppError::from)
+}
+
+#[tauri::command]
 pub fn set_deduplication(app_handle: AppHandle, state: State<'_, crate::app_state::SettingsState>, enabled: bool) {
     state.deduplicate.store(enabled, Ordering::Relaxed);
     let db_state = app_handle.state::<DbState>();
@@ -224,6 +303,9 @@ pub fn save_setting(
         },
         "app.follow_mouse" => {
             settings_state.follow_mouse.store(value != "false", Ordering::Relaxed);
+        },
+        "app.remember_window_geometry" => {
+            settings_state.remember_window_geometry.store(value == "true", Ordering::Relaxed);
         },
         "app.hide_tray_icon" => {
             settings_state.hide_tray_icon.store(value == "true", Ordering::Relaxed);

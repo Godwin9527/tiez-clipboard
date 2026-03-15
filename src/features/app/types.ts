@@ -138,6 +138,8 @@ export interface AppState {
   setEdgeDocking: StateSetter<boolean>;
   followMouse: boolean;
   setFollowMouse: StateSetter<boolean>;
+  rememberWindowGeometry: boolean;
+  setRememberWindowGeometry: StateSetter<boolean>;
   customBackground: string;
   setCustomBackground: StateSetter<string>;
   customBackgroundOpacity: number;
@@ -236,4 +238,24 @@ export interface AppState {
   setProcessingAiId: StateSetter<number | null>;
   typeFilter: string | null;
   setTypeFilter: StateSetter<string | null>;
+  autoFocusSearch: boolean;
+  setAutoFocusSearch: StateSetter<boolean>;
+  textDragSelect: boolean;
+  setTextDragSelect: StateSetter<boolean>;
+  leftClickMode: string;
+  setLeftClickMode: StateSetter<string>;
+  dragSelectPaste: boolean;
+  setDragSelectPaste: StateSetter<boolean>;
+  quickPasteNavMode: string;
+  setQuickPasteNavMode: StateSetter<string>;
+  scrollTopHotkey: string;
+  setScrollTopHotkey: StateSetter<string>;
+  isRecordingScrollTop: boolean;
+  setIsRecordingScrollTop: StateSetter<boolean>;
+  emojiPanelHotkey: string;
+  setEmojiPanelHotkey: StateSetter<string>;
+  isRecordingEmojiPanel: boolean;
+  setIsRecordingEmojiPanel: StateSetter<boolean>;
+  emojiDefaultTab: "emoji" | "favorites";
+  setEmojiDefaultTab: StateSetter<"emoji" | "favorites">;
 }

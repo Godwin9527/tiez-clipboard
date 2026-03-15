@@ -169,6 +169,9 @@ pub struct StartupSettings {
     pub sequential_hotkey: String,
     pub rich_paste_hotkey: String,
     pub search_hotkey: String,
+    pub scroll_top_hotkey: String,
+    pub emoji_panel_hotkey: String,
+    pub quick_paste_nav_mode: String,
     pub sound_enabled: bool,
     pub hide_tray_icon: bool,
     pub edge_docking: bool,
@@ -179,6 +182,7 @@ pub struct StartupSettings {
     pub main_hotkey: String,
     pub arrow_key_selection: bool,
     pub auto_close_server: bool,
+    pub remember_window_geometry: bool,
 }
 
 fn load_settings(repo: &impl SettingsRepository) -> StartupSettings {
@@ -198,6 +202,9 @@ fn load_settings(repo: &impl SettingsRepository) -> StartupSettings {
         sequential_hotkey: repo.get("app.sequential_hotkey").unwrap_or(Some("Alt+V".to_string())).unwrap_or("Alt+V".to_string()),
         rich_paste_hotkey: repo.get("app.rich_paste_hotkey").unwrap_or(Some("Ctrl+Shift+Z".to_string())).unwrap_or("Ctrl+Shift+Z".to_string()),
         search_hotkey: repo.get("app.search_hotkey").unwrap_or(Some("Alt+F".to_string())).unwrap_or("Alt+F".to_string()),
+        scroll_top_hotkey: repo.get("app.scroll_top_hotkey").unwrap_or(Some("Alt+W".to_string())).unwrap_or("Alt+W".to_string()),
+        emoji_panel_hotkey: repo.get("app.emoji_panel_hotkey").unwrap_or(Some("".to_string())).unwrap_or("".to_string()),
+        quick_paste_nav_mode: repo.get("app.quick_paste_nav_mode").unwrap_or(Some("off".to_string())).unwrap_or("off".to_string()),
         sound_enabled: repo.get("app.sound_enabled").unwrap_or(Some("false".to_string())).map(|v| v == "true").unwrap_or(false),
         hide_tray_icon: repo.get("app.hide_tray_icon").unwrap_or(Some("false".to_string())).map(|v| v == "true").unwrap_or(false),
         edge_docking: repo.get("app.edge_docking").unwrap_or(Some("false".to_string())).map(|v| v == "true").unwrap_or(false),
@@ -216,6 +223,7 @@ fn load_settings(repo: &impl SettingsRepository) -> StartupSettings {
         main_hotkey: repo.get("app.hotkey").unwrap_or(Some("Win+V".to_string())).unwrap_or("Win+V".to_string()),
         arrow_key_selection: repo.get("app.arrow_key_selection").unwrap_or(Some("false".to_string())).map(|v| v == "true").unwrap_or(false),
         auto_close_server: repo.get("file_transfer_auto_close").unwrap_or(Some("false".to_string())).map(|v| v == "true").unwrap_or(false),
+        remember_window_geometry: repo.get("app.remember_window_geometry").unwrap_or(Some("false".to_string())).map(|v| v == "true").unwrap_or(false),
     }
 }
 
@@ -242,6 +250,9 @@ fn setup_state(app: &App, conn_arc: std::sync::Arc<std::sync::Mutex<rusqlite::Co
         sequential_paste_hotkey: std::sync::Mutex::new(s.sequential_hotkey.clone()),
         rich_paste_hotkey: std::sync::Mutex::new(s.rich_paste_hotkey.clone()),
         search_hotkey: std::sync::Mutex::new(s.search_hotkey.clone()),
+        scroll_top_hotkey: std::sync::Mutex::new(s.scroll_top_hotkey.clone()),
+        emoji_panel_hotkey: std::sync::Mutex::new(s.emoji_panel_hotkey.clone()),
+        quick_paste_nav_mode: std::sync::Mutex::new(s.quick_paste_nav_mode.clone()),
         sound_enabled: AtomicBool::new(s.sound_enabled),
         hide_tray_icon: AtomicBool::new(s.hide_tray_icon),
         edge_docking: AtomicBool::new(s.edge_docking),
@@ -249,6 +260,7 @@ fn setup_state(app: &App, conn_arc: std::sync::Arc<std::sync::Mutex<rusqlite::Co
         arrow_key_selection: AtomicBool::new(s.arrow_key_selection),
         main_hotkey: std::sync::Mutex::new(s.main_hotkey.clone()),
         monitors: std::sync::Mutex::new(Vec::new()),
+        remember_window_geometry: AtomicBool::new(s.remember_window_geometry),
     });
     
     app.manage(SessionHistory(std::sync::Mutex::new(std::collections::VecDeque::new())));
@@ -261,6 +273,15 @@ fn setup_state(app: &App, conn_arc: std::sync::Arc<std::sync::Mutex<rusqlite::Co
     app.manage(crate::services::file_transfer::WsBroadcaster(std::sync::Mutex::new(None)));
     app.manage(crate::services::file_transfer::OnlineDevices(std::sync::Mutex::new(std::collections::HashMap::new())));
     app.manage(PasteQueue::default());
+
+    // Set quick-paste nav mode global
+    let nav_val = match s.quick_paste_nav_mode.as_str() {
+        "wheel" => 1u8,
+        "arrow" => 2,
+        "both" => 3,
+        _ => 0, // "off"
+    };
+    QUICK_PASTE_NAV_MODE.store(nav_val, Ordering::Relaxed);
 }
 
 fn setup_main_window(app: &App, s: &StartupSettings) {
@@ -355,6 +376,20 @@ fn start_services(app: &App, s: &StartupSettings, app_handle: AppHandle) {
     // Search Hotkey (show window + focus search box)
     if !s.search_hotkey.is_empty() {
         if let Ok(shortcut) = s.search_hotkey.replace("Win", "Super").parse::<Shortcut>() {
+            let _ = app.global_shortcut().register(shortcut);
+        }
+    }
+
+    // Scroll-to-top Hotkey: handled via low-level hook (not global shortcut)
+    if !s.scroll_top_hotkey.is_empty() {
+        if let Some(parsed) = crate::app::hooks::parse_hotkey_for_hook(&s.scroll_top_hotkey) {
+            *crate::global_state::SCROLL_TOP_HOTKEY.lock().unwrap() = Some(parsed);
+        }
+    }
+
+    // Emoji Panel Hotkey
+    if !s.emoji_panel_hotkey.is_empty() {
+        if let Ok(shortcut) = s.emoji_panel_hotkey.replace("Win", "Super").parse::<Shortcut>() {
             let _ = app.global_shortcut().register(shortcut);
         }
     }
@@ -801,6 +836,16 @@ pub fn handle_global_shortcut(app: &AppHandle, shortcut: &tauri_plugin_global_sh
             let _ = app.emit("focus-search-input", ());
         }
     }
+
+    if let Ok(emoji_s) = {
+        let val = settings.emoji_panel_hotkey.lock().unwrap().clone();
+        val.replace("Win", "Super").parse::<Shortcut>()
+    } {
+        if shortcut == &emoji_s {
+            toggle_window(app);
+            let _ = app.emit("open-emoji-panel", ());
+        }
+    }
 }
 
 pub fn handle_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
@@ -834,6 +879,16 @@ pub fn handle_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
                 return;
             }
             persist_window_size(window, size.width, size.height);
+            persist_window_geometry(window);
+        }
+        tauri::WindowEvent::Moved(_) => {
+            if window.label() != "main" {
+                return;
+            }
+            if window.is_minimized().unwrap_or(false) || !window.is_visible().unwrap_or(false) {
+                return;
+            }
+            persist_window_geometry(window);
         }
         tauri::WindowEvent::CloseRequested { api, .. } => {
             if window.label() != "main" {
@@ -893,6 +948,69 @@ fn persist_window_size(window: &tauri::Window, width: u32, height: u32) {
             }
 
             WINDOW_SIZE_SAVE_PENDING.store(false, Ordering::SeqCst);
+            break;
+        }
+    });
+}
+
+static GEOMETRY_SAVE_PENDING: AtomicBool = AtomicBool::new(false);
+static LAST_GEOMETRY_EVENT_MS: AtomicU64 = AtomicU64::new(0);
+
+fn persist_window_geometry(window: &tauri::Window) {
+    // Don't save during geometry restore (set_size/set_position triggers Moved/Resized)
+    if RESTORING_GEOMETRY.load(Ordering::Relaxed) {
+        return;
+    }
+    // Don't save when window is hidden (hide() moves to -32000,-32000 on Windows)
+    if !window.is_visible().unwrap_or(false) {
+        return;
+    }
+    let settings = window.app_handle().state::<SettingsState>();
+    if !settings.remember_window_geometry.load(Ordering::Relaxed) {
+        return;
+    }
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+    LAST_GEOMETRY_EVENT_MS.store(now, Ordering::Relaxed);
+
+    if GEOMETRY_SAVE_PENDING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+
+    let app_handle = window.app_handle().clone();
+    let win_label = window.label().to_string();
+    std::thread::spawn(move || {
+        loop {
+            std::thread::sleep(std::time::Duration::from_millis(300));
+            let last_event = LAST_GEOMETRY_EVENT_MS.load(Ordering::Relaxed);
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
+            if now.saturating_sub(last_event) < 250 {
+                continue;
+            }
+
+            if let Some(win) = app_handle.get_webview_window(&win_label) {
+                let pos = win.outer_position().ok();
+                let size = win.outer_size().ok();
+                let monitor = win.current_monitor().ok().flatten();
+                if let (Some(p), Some(s), Some(m)) = (pos, size, monitor) {
+                    if s.width >= 200 && s.height >= 200 {
+                        let mp = m.position();
+                        let offset_x = p.x - mp.x;
+                        let offset_y = p.y - mp.y;
+                        crate::app::window_manager::save_geometry(
+                            &app_handle, &m, offset_x, offset_y, s.width, s.height
+                        );
+                    }
+                }
+            }
+
+            GEOMETRY_SAVE_PENDING.store(false, Ordering::SeqCst);
             break;
         }
     });

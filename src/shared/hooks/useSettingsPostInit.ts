@@ -23,6 +23,7 @@ interface UseSettingsPostInitOptions {
   setPrivacyProtectionCustomRules: (val: string) => void;
   setSilentStart: (val: boolean) => void;
   setFollowMouse: (val: boolean) => void;
+  setRememberWindowGeometry: (val: boolean) => void;
   setShowAppBorder: (val: boolean) => void;
   setDeleteAfterPaste: (val: boolean) => void;
   setMoveToTopAfterPaste: (val: boolean) => void;
@@ -78,6 +79,14 @@ interface UseSettingsPostInitOptions {
   setTagManagerEnabled: (val: boolean) => void;
   setEmojiPanelTab: (val: "emoji" | "favorites") => void;
   setEmojiFavorites: (val: string[]) => void;
+  setAutoFocusSearch: (val: boolean) => void;
+  setTextDragSelect: (val: boolean) => void;
+  setLeftClickMode: (val: string) => void;
+  setDragSelectPaste: (val: boolean) => void;
+  setQuickPasteNavMode: (val: string) => void;
+  setScrollTopHotkey: (val: string) => void;
+  setEmojiPanelHotkey: (val: string) => void;
+  setEmojiDefaultTab: (val: "emoji" | "favorites") => void;
 }
 
 export const useSettingsPostInit = ({
@@ -98,6 +107,7 @@ export const useSettingsPostInit = ({
   setPrivacyProtectionCustomRules,
   setSilentStart,
   setFollowMouse,
+  setRememberWindowGeometry,
   setShowAppBorder,
   setDeleteAfterPaste,
   setMoveToTopAfterPaste,
@@ -152,7 +162,15 @@ export const useSettingsPostInit = ({
   setEmojiPanelEnabled,
   setTagManagerEnabled,
   setEmojiPanelTab,
-  setEmojiFavorites
+  setEmojiFavorites,
+  setAutoFocusSearch,
+  setTextDragSelect,
+  setLeftClickMode,
+  setDragSelectPaste,
+  setQuickPasteNavMode,
+  setScrollTopHotkey,
+  setEmojiPanelHotkey,
+  setEmojiDefaultTab
 }: UseSettingsPostInitOptions) => {
   useEffect(() => {
     if (!settings) return;
@@ -230,6 +248,7 @@ export const useSettingsPostInit = ({
     }
     setSilentStart(settings["app.silent_start"] !== "false");
     setFollowMouse(settings["app.follow_mouse"] !== "false");
+    setRememberWindowGeometry(settings["app.remember_window_geometry"] === "true");
     setShowAppBorder(settings["app.show_app_border"] !== "false");
 
     // These have false as default, so check for 'true'
@@ -286,6 +305,28 @@ export const useSettingsPostInit = ({
     if (settings["ai_enabled"]) setAiEnabled(settings["ai_enabled"] === "true");
     if (settings["ai_target_lang"]) setAiTargetLang(settings["ai_target_lang"]);
     if (settings["ai_thinking_budget"]) setAiThinkingBudget(settings["ai_thinking_budget"]);
+
+    setAutoFocusSearch(settings["app.auto_focus_search"] === "true");
+    setTextDragSelect(settings["app.text_drag_select"] === "true");
+    {
+      const raw = settings["app.left_click_noop"] || "off";
+      if (raw === "true") setLeftClickMode("right_click_paste");
+      else if (raw === "false" || raw === "off") setLeftClickMode("off");
+      else setLeftClickMode(raw);
+    }
+    setDragSelectPaste(settings["app.drag_select_paste"] === "true");
+    if (settings["app.quick_paste_nav_mode"]) {
+      setQuickPasteNavMode(settings["app.quick_paste_nav_mode"]);
+    }
+    if (settings["app.scroll_top_hotkey"]) {
+      setScrollTopHotkey(settings["app.scroll_top_hotkey"]);
+    }
+    if (settings["app.emoji_panel_hotkey"]) {
+      setEmojiPanelHotkey(settings["app.emoji_panel_hotkey"]);
+    }
+    if (settings["app.emoji_default_tab"] === "favorites") {
+      setEmojiDefaultTab("favorites");
+    }
 
     if (settings["app.window_pinned"] === "true") {
       setIsWindowPinned(true);
@@ -377,6 +418,7 @@ export const useSettingsPostInit = ({
     setPrivacyProtectionCustomRules,
     setSilentStart,
     setFollowMouse,
+    setRememberWindowGeometry,
     setShowAppBorder,
     setDeleteAfterPaste,
     setMoveToTopAfterPaste,

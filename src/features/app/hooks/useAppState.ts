@@ -86,6 +86,7 @@ export const useAppState = (): AppState => {
   const [hideTrayIcon, setHideTrayIcon] = useState(false);
   const [edgeDocking, setEdgeDocking] = useState(false);
   const [followMouse, setFollowMouse] = useState(true);
+  const [rememberWindowGeometry, setRememberWindowGeometry] = useState(false);
   const [customBackground, setCustomBackground] = useState<string>("");
   const [customBackgroundOpacity, setCustomBackgroundOpacity] = useState(45);
   const [surfaceOpacity, setSurfaceOpacity] = useState(50);
@@ -157,6 +158,16 @@ export const useAppState = (): AppState => {
   const [aiAssignedProfileTranslate, setAiAssignedProfileTranslate] = useState("default");
   const [processingAiId, setProcessingAiId] = useState<number | null>(null);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const [autoFocusSearch, setAutoFocusSearch] = useState(false);
+  const [textDragSelect, setTextDragSelect] = useState(false);
+  const [leftClickMode, setLeftClickMode] = useState("off");
+  const [dragSelectPaste, setDragSelectPaste] = useState(false);
+  const [quickPasteNavMode, setQuickPasteNavMode] = useState("off");
+  const [scrollTopHotkey, setScrollTopHotkey] = useState("Alt+W");
+  const [isRecordingScrollTop, setIsRecordingScrollTop] = useState(false);
+  const [emojiPanelHotkey, setEmojiPanelHotkey] = useState("");
+  const [isRecordingEmojiPanel, setIsRecordingEmojiPanel] = useState(false);
+  const [emojiDefaultTab, setEmojiDefaultTab] = useState<"emoji" | "favorites">("emoji");
 
   return {
     showSettings,
@@ -289,6 +300,8 @@ export const useAppState = (): AppState => {
     setEdgeDocking,
     followMouse,
     setFollowMouse,
+    rememberWindowGeometry,
+    setRememberWindowGeometry,
     customBackground,
     setCustomBackground,
     customBackgroundOpacity,
@@ -386,7 +399,27 @@ export const useAppState = (): AppState => {
     processingAiId,
     setProcessingAiId,
     typeFilter,
-    setTypeFilter
+    setTypeFilter,
+    autoFocusSearch,
+    setAutoFocusSearch,
+    textDragSelect,
+    setTextDragSelect,
+    leftClickMode,
+    setLeftClickMode,
+    dragSelectPaste,
+    setDragSelectPaste,
+    quickPasteNavMode,
+    setQuickPasteNavMode,
+    scrollTopHotkey,
+    setScrollTopHotkey,
+    isRecordingScrollTop,
+    setIsRecordingScrollTop,
+    emojiPanelHotkey,
+    setEmojiPanelHotkey,
+    isRecordingEmojiPanel,
+    setIsRecordingEmojiPanel,
+    emojiDefaultTab,
+    setEmojiDefaultTab
   };
 };
 

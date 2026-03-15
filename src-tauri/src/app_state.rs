@@ -21,6 +21,9 @@ pub struct SettingsState {
     pub sequential_paste_hotkey: Mutex<String>,
     pub rich_paste_hotkey: Mutex<String>,
     pub search_hotkey: Mutex<String>,
+    pub scroll_top_hotkey: Mutex<String>,
+    pub emoji_panel_hotkey: Mutex<String>,
+    pub quick_paste_nav_mode: Mutex<String>,
     pub sound_enabled: AtomicBool,
     pub hide_tray_icon: AtomicBool,
     pub edge_docking: AtomicBool,
@@ -28,6 +31,7 @@ pub struct SettingsState {
     pub arrow_key_selection: AtomicBool,
     pub main_hotkey: Mutex<String>,
     pub monitors: Mutex<Vec<tauri::Monitor>>,
+    pub remember_window_geometry: AtomicBool,
 }
 
 #[derive(Default)]

@@ -6,7 +6,7 @@ use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM, RECT};
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, KBDLLHOOKSTRUCT, MSLLHOOKSTRUCT,
     WM_KEYDOWN, WM_SYSKEYDOWN, WM_KEYUP, WM_SYSKEYUP,
-    WM_LBUTTONDOWN, WM_RBUTTONDOWN, WM_MBUTTONDOWN
+    WM_LBUTTONDOWN, WM_RBUTTONDOWN, WM_MBUTTONDOWN, WM_MOUSEWHEEL
 };
 #[cfg(target_os = "windows")]
 use windows::Win32::UI::Input::KeyboardAndMouse::{
@@ -21,6 +21,11 @@ use crate::infrastructure::windows_ext::WindowExt;
 
 // Store registered hotkey IDs for cleanup
 static BLOCKED_HOTKEY_IDS: std::sync::Mutex<Vec<i32>> = std::sync::Mutex::new(Vec::new());
+
+// Cooldown flag: consume remaining modifier key-ups after quick paste confirm
+// to prevent Windows input language switch (Ctrl+Shift) from stealing focus.
+use std::sync::atomic::AtomicBool;
+static QUICK_PASTE_CONFIRM_COOLDOWN: AtomicBool = AtomicBool::new(false);
 
 #[tauri::command]
 pub fn set_recording_mode(app_handle: AppHandle, enabled: bool) -> Result<(), String> {
@@ -194,9 +199,44 @@ pub unsafe extern "system" fn keyboard_proc(n_code: i32, w_param: WPARAM, l_para
              }
         }
 
+        // 4. Scroll-to-top hotkey (handled via hook so other apps can use the key when window is hidden)
+        if is_down {
+            if let Ok(guard) = SCROLL_TOP_HOTKEY.lock() {
+                if let Some(ref hk) = *guard {
+                    if vk == hk.vk {
+                        let ctrl_down = (GetAsyncKeyState(VK_CONTROL.0 as i32) as u16 & 0x8000) != 0;
+                        let shift_down = (GetAsyncKeyState(VK_SHIFT.0 as i32) as u16 & 0x8000) != 0;
+                        let alt_down = (GetAsyncKeyState(VK_MENU.0 as i32) as u16 & 0x8000) != 0;
+                        let win_down = (GetAsyncKeyState(VK_LWIN.0 as i32) as u16 & 0x8000 != 0) || (GetAsyncKeyState(VK_RWIN.0 as i32) as u16 & 0x8000 != 0);
+                        if ctrl_down == hk.ctrl && shift_down == hk.shift && alt_down == hk.alt && win_down == hk.win {
+                            // Only consume the key when the clipboard window is visible
+                            if let Some(handle) = GLOBAL_APP_HANDLE.get() {
+                                if let Some(window) = handle.get_webview_window("main") {
+                                    if let Ok(hwnd_raw) = window.hwnd() {
+                                        let main_hwnd = HWND(hwnd_raw.0);
+                                        let is_visible = WindowExt::is_window_visible(main_hwnd);
+                                        let is_hidden_by_edge = IS_HIDDEN.load(Ordering::Relaxed);
+                                        if is_visible && !is_hidden_by_edge {
+                                            let _ = handle.emit("scroll-to-top", ());
+                                            return LRESULT(1);
+                                        }
+                                    }
+                                }
+                            }
+                            // Window not visible: pass through to other apps
+                        }
+                    }
+                }
+            }
+        }
+
         // 5. Global Navigation Keys (Up/Down, Enter, Esc)
         if NAVIGATION_ENABLED.load(Ordering::SeqCst) && !IS_RECORDING.load(Ordering::SeqCst) {
              if IS_HIDDEN.load(Ordering::Relaxed) {
+                 return CallNextHookEx(None, n_code, w_param, l_param);
+             }
+             // Only intercept navigation keys when clipboard window has focus
+             if !IS_MAIN_WINDOW_FOCUSED.load(Ordering::Relaxed) {
                  return CallNextHookEx(None, n_code, w_param, l_param);
              }
              let allow_navigation = if let Some(handle) = GLOBAL_APP_HANDLE.get() {
@@ -252,6 +292,97 @@ pub unsafe extern "system" fn keyboard_proc(n_code: i32, w_param: WPARAM, l_para
                       }
                   }
              }
+        }
+
+        // Consume remaining modifier releases after quick paste confirm
+        // to prevent Ctrl+Shift language switch from stealing focus
+        if QUICK_PASTE_CONFIRM_COOLDOWN.load(Ordering::Relaxed) {
+            let is_modifier = vk == 0x10 || vk == 0x11 || (vk >= 0xA0 && vk <= 0xA3);
+            if is_up && is_modifier {
+                QUICK_PASTE_CONFIRM_COOLDOWN.store(false, Ordering::Relaxed);
+                return LRESULT(1);
+            }
+            if is_down {
+                QUICK_PASTE_CONFIRM_COOLDOWN.store(false, Ordering::Relaxed);
+            }
+        }
+
+        // Quick Paste Mode handling
+        if QUICK_PASTE_MODE.load(Ordering::Relaxed) {
+            // On ESC keydown: cancel quick paste
+            if is_down && vk == 0x1B {
+                QUICK_PASTE_MODE.store(false, Ordering::Relaxed);
+                NAVIGATION_MODE_ACTIVE.store(false, Ordering::Relaxed);
+                if let Some(handle) = GLOBAL_APP_HANDLE.get() {
+                    let handle_clone = handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let _ = handle_clone.emit("navigation-action", "escape");
+                        toggle_window(&handle_clone);
+                    });
+                }
+                return LRESULT(1);
+            }
+
+            // On Ctrl or Shift keyup: confirm paste immediately
+            // Don't use GetAsyncKeyState here - it's unreliable in low-level hooks
+            // (the key state may not be updated yet when the hook fires)
+            let is_ctrl_or_shift = vk == 0x10 || vk == 0x11 ||
+                (vk >= 0xA0 && vk <= 0xA3); // LShift, RShift, LCtrl, RCtrl
+            if is_up && is_ctrl_or_shift {
+                QUICK_PASTE_MODE.store(false, Ordering::Relaxed);
+                NAVIGATION_MODE_ACTIVE.store(false, Ordering::Relaxed);
+                NAVIGATION_ENABLED.store(false, Ordering::SeqCst);
+                QUICK_PASTE_CONFIRM_COOLDOWN.store(true, Ordering::Relaxed);
+                if let Some(handle) = GLOBAL_APP_HANDLE.get() {
+                    let _ = handle.emit("quick-paste-confirm", ());
+                }
+                return LRESULT(1);
+            }
+
+            // In quick-paste mode, arrow keys navigate (if nav mode allows)
+            let nav_mode = QUICK_PASTE_NAV_MODE.load(Ordering::Relaxed);
+            let arrow_allowed = nav_mode == 2 || nav_mode == 3; // arrow or both
+            if is_down && (vk == 0x26 || vk == 0x28) && arrow_allowed {
+                if let Some(handle) = GLOBAL_APP_HANDLE.get() {
+                    let action = if vk == 0x26 { "up" } else { "down" };
+                    let _ = handle.emit("navigation-action", action);
+                    return LRESULT(1);
+                }
+            }
+        } else {
+            // Not in quick-paste mode: detect Ctrl+Shift+Arrow to activate
+            let nav_mode = QUICK_PASTE_NAV_MODE.load(Ordering::Relaxed);
+            if nav_mode > 0 && is_down && (vk == 0x26 || vk == 0x28) {
+                let ctrl_down = (GetAsyncKeyState(VK_CONTROL.0 as i32) as u16 & 0x8000) != 0;
+                let shift_down = (GetAsyncKeyState(VK_SHIFT.0 as i32) as u16 & 0x8000) != 0;
+                let alt_down = (GetAsyncKeyState(VK_MENU.0 as i32) as u16 & 0x8000) != 0;
+                let win_down = (GetAsyncKeyState(VK_LWIN.0 as i32) as u16 & 0x8000 != 0) || (GetAsyncKeyState(VK_RWIN.0 as i32) as u16 & 0x8000 != 0);
+
+                let arrow_allowed = nav_mode == 2 || nav_mode == 3;
+                if ctrl_down && shift_down && !alt_down && !win_down && arrow_allowed {
+                    // Activate quick-paste mode
+                    QUICK_PASTE_MODE.store(true, Ordering::Relaxed);
+                    NAVIGATION_ENABLED.store(true, Ordering::SeqCst);
+                    NAVIGATION_MODE_ACTIVE.store(true, Ordering::Relaxed);
+                    if let Some(handle) = GLOBAL_APP_HANDLE.get() {
+                        let handle_clone = handle.clone();
+                        let action = if vk == 0x26 { "up" } else { "down" };
+                        tauri::async_runtime::spawn(async move {
+                            // Only show window if not already visible
+                            if let Some(window) = handle_clone.get_webview_window("main") {
+                                let is_visible = window.is_visible().unwrap_or(false);
+                                let is_hidden_by_edge = IS_HIDDEN.load(Ordering::Relaxed);
+                                if !is_visible || is_hidden_by_edge {
+                                    toggle_window(&handle_clone);
+                                }
+                            }
+                            let _ = handle_clone.emit("quick-paste-activated", ());
+                            let _ = handle_clone.emit("navigation-action", action);
+                        });
+                    }
+                    return LRESULT(1);
+                }
+            }
         }
 
     }
@@ -330,6 +461,55 @@ pub unsafe extern "system" fn mouse_proc(n_code: i32, w_param: WPARAM, l_param: 
                 if current == "mousemiddle" || current == "mbutton" {
                     if let Some(handle) = GLOBAL_APP_HANDLE.get() {
                         toggle_window(&handle);
+                    }
+                    return LRESULT(1);
+                }
+            }
+        }
+
+        // Mouse wheel in quick-paste mode or Ctrl+Shift activation
+        if msg == WM_MOUSEWHEEL {
+            let nav_mode = QUICK_PASTE_NAV_MODE.load(Ordering::Relaxed);
+            let wheel_allowed = nav_mode == 1 || nav_mode == 3; // wheel or both
+
+            if QUICK_PASTE_MODE.load(Ordering::Relaxed) && wheel_allowed {
+                let mouse_struct = *(l_param.0 as *const MSLLHOOKSTRUCT);
+                let hi_word = ((mouse_struct.mouseData >> 16) & 0xFFFF) as i16;
+                let action = if hi_word > 0 { "up" } else { "down" };
+                if let Some(handle) = GLOBAL_APP_HANDLE.get() {
+                    let _ = handle.emit("navigation-action", action);
+                }
+                return LRESULT(1);
+            } else if !QUICK_PASTE_MODE.load(Ordering::Relaxed) && nav_mode > 0 && wheel_allowed {
+                // Detect Ctrl+Shift+Wheel to activate quick-paste mode
+                let ctrl_down = (GetAsyncKeyState(VK_CONTROL.0 as i32) as u16 & 0x8000) != 0;
+                let shift_down = (GetAsyncKeyState(VK_SHIFT.0 as i32) as u16 & 0x8000) != 0;
+                let alt_down = (GetAsyncKeyState(VK_MENU.0 as i32) as u16 & 0x8000) != 0;
+                let win_down = (GetAsyncKeyState(VK_LWIN.0 as i32) as u16 & 0x8000 != 0) || (GetAsyncKeyState(VK_RWIN.0 as i32) as u16 & 0x8000 != 0);
+
+                if ctrl_down && shift_down && !alt_down && !win_down {
+                    let mouse_struct = *(l_param.0 as *const MSLLHOOKSTRUCT);
+                    let hi_word = ((mouse_struct.mouseData >> 16) & 0xFFFF) as i16;
+                    let action = if hi_word > 0 { "up" } else { "down" };
+
+                    QUICK_PASTE_MODE.store(true, Ordering::Relaxed);
+                    NAVIGATION_ENABLED.store(true, Ordering::SeqCst);
+                    NAVIGATION_MODE_ACTIVE.store(true, Ordering::Relaxed);
+                    if let Some(handle) = GLOBAL_APP_HANDLE.get() {
+                        let handle_clone = handle.clone();
+                        let action_str = action.to_string();
+                        tauri::async_runtime::spawn(async move {
+                            // Only show window if not already visible
+                            if let Some(window) = handle_clone.get_webview_window("main") {
+                                let is_visible = window.is_visible().unwrap_or(false);
+                                let is_hidden_by_edge = IS_HIDDEN.load(Ordering::Relaxed);
+                                if !is_visible || is_hidden_by_edge {
+                                    toggle_window(&handle_clone);
+                                }
+                            }
+                            let _ = handle_clone.emit("quick-paste-activated", ());
+                            let _ = handle_clone.emit("navigation-action", action_str);
+                        });
                     }
                     return LRESULT(1);
                 }

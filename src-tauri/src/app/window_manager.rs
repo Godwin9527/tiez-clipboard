@@ -2,6 +2,8 @@ use tauri::{AppHandle, Manager, Emitter};
 use std::sync::atomic::Ordering;
 use crate::app_state::SettingsState;
 use crate::global_state::*;
+use crate::database::DbState;
+use crate::infrastructure::repository::settings_repo::SettingsRepository;
 #[cfg(target_os = "windows")]
 use crate::infrastructure::windows_ext::WindowExt;
 
@@ -9,6 +11,33 @@ use crate::infrastructure::windows_ext::WindowExt;
 use windows::Win32::Foundation::{HWND, POINT};
 #[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::{GetCursorPos, GetWindowLongPtrW, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_NOACTIVATE};
+
+fn monitor_key(m: &tauri::Monitor) -> String {
+    let s = m.size();
+    format!("{}x{}", s.width, s.height)
+}
+
+fn load_geometry(app: &AppHandle, monitor: &tauri::Monitor) -> Option<(i32, i32, u32, u32)> {
+    let key = format!("app.window_geometry_{}", monitor_key(monitor));
+    let db = app.try_state::<DbState>()?;
+    let val = db.settings_repo.get(&key).ok()??;
+    let parts: Vec<&str> = val.split(',').collect();
+    if parts.len() != 4 { return None; }
+    let offset_x = parts[0].parse::<i32>().ok()?;
+    let offset_y = parts[1].parse::<i32>().ok()?;
+    let w = parts[2].parse::<u32>().ok()?;
+    let h = parts[3].parse::<u32>().ok()?;
+    if w < 200 || h < 200 { return None; }
+    Some((offset_x, offset_y, w, h))
+}
+
+pub fn save_geometry(app: &AppHandle, monitor: &tauri::Monitor, offset_x: i32, offset_y: i32, w: u32, h: u32) {
+    let key = format!("app.window_geometry_{}", monitor_key(monitor));
+    let val = format!("{},{},{},{}", offset_x, offset_y, w, h);
+    if let Some(db) = app.try_state::<DbState>() {
+        let _ = db.settings_repo.set(&key, &val);
+    }
+}
 
 pub fn toggle_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
@@ -59,7 +88,51 @@ pub fn toggle_window(app: &AppHandle) {
 
         if let Ok(size) = window.outer_size() {
             let settings = app.state::<SettingsState>();
-            if settings.follow_mouse.load(Ordering::Relaxed) {
+            let mut positioned = false;
+
+            // Remember-geometry mode: restore per-monitor position & size
+            if !was_docked && settings.remember_window_geometry.load(Ordering::Relaxed) {
+                #[cfg(windows)]
+                {
+                    let mut point = POINT::default();
+                    unsafe { let _ = GetCursorPos(&mut point); }
+                    let (ref_x, ref_y) = active_center.unwrap_or((point.x, point.y));
+
+                    let mut target_monitor: Option<tauri::Monitor> = None;
+                    if let Ok(monitors) = window.available_monitors() {
+                        for m in &monitors {
+                            let mp = m.position();
+                            let ms = m.size();
+                            if ref_x >= mp.x && ref_x < mp.x + ms.width as i32
+                                && ref_y >= mp.y && ref_y < mp.y + ms.height as i32
+                            {
+                                target_monitor = Some(m.clone());
+                                break;
+                            }
+                        }
+                        if target_monitor.is_none() && !monitors.is_empty() {
+                            target_monitor = Some(monitors[0].clone());
+                        }
+                    }
+
+                    if let Some(ref tm) = target_monitor {
+                        if let Some((ox, oy, gw, gh)) = load_geometry(app, tm) {
+                            let mp = tm.position();
+                            let restore_x = mp.x + ox;
+                            let restore_y = mp.y + oy;
+                            RESTORING_GEOMETRY.store(true, Ordering::Relaxed);
+                            // Position first (triggers WM_DPICHANGED if crossing monitors),
+                            // then size (applied at the correct DPI).
+                            let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x: restore_x, y: restore_y }));
+                            let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize { width: gw, height: gh }));
+                            RESTORING_GEOMETRY.store(false, Ordering::Relaxed);
+                            positioned = true;
+                        }
+                    }
+                }
+            }
+
+            if !positioned && settings.follow_mouse.load(Ordering::Relaxed) {
                 let w = size.width as i32;
                 let h = size.height as i32;
                 
@@ -108,7 +181,7 @@ pub fn toggle_window(app: &AppHandle) {
 
                     let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x: target_x, y: target_y }));
                 }
-            } else if was_docked {
+            } else if !positioned && was_docked {
                 let mut target_monitor = window.current_monitor().ok().flatten();
 
                 #[cfg(windows)]
@@ -156,7 +229,7 @@ pub fn toggle_window(app: &AppHandle) {
                           }
                      }
                 }
-            } else {
+            } else if !positioned {
                 let w = size.width as i32;
                 let h = size.height as i32;
 
@@ -242,6 +315,9 @@ pub fn toggle_window(app: &AppHandle) {
         {
             let _ = window.show();
         }
+
+        // Notify frontend that window was shown (e.g., to close settings panel)
+        let _ = app.emit("window-shown", ());
     }
 }
 

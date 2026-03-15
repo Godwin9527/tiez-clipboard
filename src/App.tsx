@@ -192,6 +192,7 @@ const App = () => {
     setHideTrayIcon,
     setEdgeDocking,
     setFollowMouse,
+    setRememberWindowGeometry,
     customBackground,
     setCustomBackground,
     customBackgroundOpacity,
@@ -263,7 +264,25 @@ const App = () => {
     processingAiId,
     setProcessingAiId,
     typeFilter,
-    setTypeFilter
+    setTypeFilter,
+    autoFocusSearch,
+    setAutoFocusSearch,
+    textDragSelect,
+    setTextDragSelect,
+    leftClickMode,
+    setLeftClickMode,
+    dragSelectPaste,
+    setDragSelectPaste,
+    setQuickPasteNavMode,
+    scrollTopHotkey,
+    setScrollTopHotkey,
+    isRecordingScrollTop,
+    setIsRecordingScrollTop,
+    emojiPanelHotkey,
+    setEmojiPanelHotkey,
+    isRecordingEmojiPanel,
+    setIsRecordingEmojiPanel,
+    setEmojiDefaultTab
   } = appState;
 
   const effectiveShowEmojiPanel = showEmojiPanel && emojiPanelEnabled;
@@ -346,7 +365,7 @@ const App = () => {
 
   useEffect(() => {
     const handleKeydown = (event: KeyboardEvent) => {
-      if (isRecording || isRecordingSequential || isRecordingRich || isRecordingSearch) return;
+      if (isRecording || isRecordingSequential || isRecordingRich || isRecordingSearch || isRecordingScrollTop || isRecordingEmojiPanel) return;
       if (!hotkey || hotkey === t('not_set')) return;
 
       const activeEl = document.activeElement as HTMLElement | null;
@@ -370,7 +389,7 @@ const App = () => {
 
     window.addEventListener('keydown', handleKeydown, true);
     return () => window.removeEventListener('keydown', handleKeydown, true);
-  }, [hotkey, isRecording, isRecordingSequential, isRecordingRich, isRecordingSearch, t]);
+  }, [hotkey, isRecording, isRecordingSequential, isRecordingRich, isRecordingSearch, isRecordingScrollTop, isRecordingEmojiPanel, t]);
 
 
   const { toasts, pushToast, confirmDialog, openConfirm, closeConfirm } = useOverlays();
@@ -420,6 +439,7 @@ const App = () => {
     setPrivacyProtectionCustomRules,
     setSilentStart,
     setFollowMouse,
+    setRememberWindowGeometry,
     setShowAppBorder,
     setDeleteAfterPaste,
     setMoveToTopAfterPaste,
@@ -468,7 +488,15 @@ const App = () => {
     setAiAssignedProfileTask,
     setAiAssignedProfileMouthpiece,
     setAiAssignedProfileTranslate,
-    setSettingsLoaded
+    setSettingsLoaded,
+    setAutoFocusSearch,
+    setTextDragSelect,
+    setLeftClickMode,
+    setDragSelectPaste,
+    setQuickPasteNavMode,
+    setScrollTopHotkey,
+    setEmojiPanelHotkey,
+    setEmojiDefaultTab
   });
 
   useEffect(() => {
@@ -496,6 +524,19 @@ const App = () => {
     setSearchIsFocused,
     searchInputRef
   ]);
+
+  useEffect(() => {
+    if (!autoFocusSearch) return;
+    const unlisten = listen("tauri://focus", () => {
+      if (showSettings) return;
+      setShowSearchBox(true);
+      setSearchIsFocused(true);
+      requestAnimationFrame(() => {
+        searchInputRef.current?.focus();
+      });
+    });
+    return () => { unlisten.then((off) => off()); };
+  }, [autoFocusSearch, showSettings, setShowSearchBox, setSearchIsFocused, searchInputRef]);
 
   useEffect(() => {
     if (!emojiPanelEnabled && showEmojiPanel) {
@@ -619,7 +660,9 @@ const App = () => {
     updateHotkey,
     updateSequentialHotkey,
     updateRichPasteHotkey,
-    updateSearchHotkey
+    updateSearchHotkey,
+    updateScrollTopHotkey,
+    updateEmojiPanelHotkey
   } =
     useHotkeyConfig({
       hotkey,
@@ -630,6 +673,10 @@ const App = () => {
       setRichPasteHotkey,
       searchHotkey,
       setSearchHotkey,
+      scrollTopHotkey,
+      setScrollTopHotkey,
+      emojiPanelHotkey,
+      setEmojiPanelHotkey,
       sequentialMode,
       isRecording,
       setIsRecording,
@@ -639,6 +686,10 @@ const App = () => {
       setIsRecordingRich,
       isRecordingSearch,
       setIsRecordingSearch,
+      isRecordingScrollTop,
+      setIsRecordingScrollTop,
+      isRecordingEmojiPanel,
+      setIsRecordingEmojiPanel,
       saveAppSetting,
       t,
       pushToast
@@ -731,6 +782,63 @@ const App = () => {
     setSearch
   });
 
+  // Quick Paste: refs to avoid stale closures and re-subscription races
+  const filteredHistoryRef = useRef(filteredHistory);
+  filteredHistoryRef.current = filteredHistory;
+  const selectedIndexRef = useRef(selectedIndex);
+  selectedIndexRef.current = selectedIndex;
+
+  useEffect(() => {
+    const unlistenConfirm = listen("quick-paste-confirm", () => {
+      const item = filteredHistoryRef.current[selectedIndexRef.current];
+      if (item) {
+        // Use moveToTop: false to preserve clipboard order during quick paste
+        invoke("copy_to_clipboard", {
+          content: item.content,
+          contentType: item.content_type,
+          paste: true,
+          id: item.id,
+          deleteAfterUse: false,
+          pasteWithFormat: false,
+          moveToTop: false
+        }).catch(console.error);
+      }
+    });
+
+    const unlistenActivated = listen("quick-paste-activated", () => {
+      setIsKeyboardMode(true);
+      setShowSettings(false);
+      setShowTagManager(false);
+    });
+
+    // Close settings/overlays whenever window is shown (e.g., main hotkey, quick paste)
+    const unlistenShown = listen("window-shown", () => {
+      setShowSettings(false);
+      setShowTagManager(false);
+    });
+
+    // Scroll-to-top hotkey event
+    const unlistenScrollTop = listen("scroll-to-top", () => {
+      handleScrollTop();
+    });
+
+    // Emoji panel hotkey event
+    const unlistenEmojiPanel = listen("open-emoji-panel", () => {
+      setShowSettings(false);
+      setShowTagManager(false);
+      setChatMode(false);
+      setShowEmojiPanel(true);
+    });
+
+    return () => {
+      unlistenConfirm.then(f => f());
+      unlistenActivated.then(f => f());
+      unlistenShown.then(f => f());
+      unlistenScrollTop.then(f => f());
+      unlistenEmojiPanel.then(f => f());
+    };
+  }, [setIsKeyboardMode, setShowSettings, setShowTagManager, setChatMode, setShowEmojiPanel, handleScrollTop]);
+
 
   const { renderItemContent } = useClipboardItemRenderer({
     privacyProtection,
@@ -746,6 +854,9 @@ const App = () => {
     t,
     compactMode,
     richTextSnapshotPreview,
+    textDragSelect,
+    leftClickMode,
+    dragSelectPaste,
     processingAiId,
     aiEnabled,
     aiOptionsOpenId,
@@ -773,6 +884,8 @@ const App = () => {
     updateSequentialHotkey,
     updateRichPasteHotkey,
     updateSearchHotkey,
+    updateScrollTopHotkey,
+    updateEmojiPanelHotkey,
     saveAppSetting,
     saveSetting,
     saveMqtt,

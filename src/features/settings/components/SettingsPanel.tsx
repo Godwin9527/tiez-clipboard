@@ -96,6 +96,8 @@ interface SettingsPanelProps {
     setEdgeDocking: (val: boolean) => void;
     followMouse: boolean;
     setFollowMouse: (val: boolean) => void;
+    rememberWindowGeometry: boolean;
+    setRememberWindowGeometry: (val: boolean) => void;
     customBackground: string;
     setCustomBackground: (val: string) => void;
     customBackgroundOpacity: number;
@@ -179,7 +181,7 @@ interface SettingsPanelProps {
 
     compactMode: boolean;
     setCompactMode: (val: boolean) => void;
-    checkHotkeyConflict: (newHotkey: string, mode: 'main' | 'sequential' | 'rich' | 'search') => boolean;
+    checkHotkeyConflict: (newHotkey: string, mode: 'main' | 'sequential' | 'rich' | 'search' | 'scroll_top' | 'emoji_panel') => boolean;
 
 
     setMqttEnabled: (val: boolean) => void;
@@ -232,6 +234,26 @@ interface SettingsPanelProps {
     setAiAssignedProfileMouthpiece: (id: string) => void;
     aiAssignedProfileTranslate: string;
     setAiAssignedProfileTranslate: (id: string) => void;
+    autoFocusSearch: boolean;
+    setAutoFocusSearch: (val: boolean) => void;
+    textDragSelect: boolean;
+    setTextDragSelect: (val: boolean) => void;
+    leftClickMode: string;
+    setLeftClickMode: (val: string) => void;
+    dragSelectPaste: boolean;
+    setDragSelectPaste: (val: boolean) => void;
+    quickPasteNavMode: string;
+    setQuickPasteNavMode: (val: string) => void;
+    scrollTopHotkey: string;
+    isRecordingScrollTop: boolean;
+    setIsRecordingScrollTop: (val: boolean) => void;
+    updateScrollTopHotkey: (key: string) => void;
+    emojiPanelHotkey: string;
+    isRecordingEmojiPanel: boolean;
+    setIsRecordingEmojiPanel: (val: boolean) => void;
+    updateEmojiPanelHotkey: (key: string) => void;
+    emojiDefaultTab: "emoji" | "favorites";
+    setEmojiDefaultTab: (val: "emoji" | "favorites") => void;
 }
 
 const SettingsPanel = (props: SettingsPanelProps) => {
@@ -247,6 +269,7 @@ const SettingsPanel = (props: SettingsPanelProps) => {
         hideTrayIcon, setHideTrayIcon,
         edgeDocking, setEdgeDocking,
         followMouse, setFollowMouse,
+        rememberWindowGeometry, setRememberWindowGeometry,
         customBackground, setCustomBackground,
         customBackgroundOpacity, setCustomBackgroundOpacity,
         surfaceOpacity, setSurfaceOpacity,
@@ -270,7 +293,12 @@ const SettingsPanel = (props: SettingsPanelProps) => {
         setShowAppSelector, handleResetSettings,
         aiEnabled, setAiEnabled, aiTargetLang, setAiTargetLang, aiThinkingBudget, setAiThinkingBudget, saveSetting,
         onOpenChat,
-        aiProfiles, setAiProfiles, aiAssignedProfileTask, setAiAssignedProfileTask, aiAssignedProfileMouthpiece, setAiAssignedProfileMouthpiece, aiAssignedProfileTranslate, setAiAssignedProfileTranslate
+        aiProfiles, setAiProfiles, aiAssignedProfileTask, setAiAssignedProfileTask, aiAssignedProfileMouthpiece, setAiAssignedProfileMouthpiece, aiAssignedProfileTranslate, setAiAssignedProfileTranslate,
+        autoFocusSearch, setAutoFocusSearch, textDragSelect, setTextDragSelect, leftClickMode, setLeftClickMode, dragSelectPaste, setDragSelectPaste,
+        quickPasteNavMode, setQuickPasteNavMode,
+        scrollTopHotkey, isRecordingScrollTop, setIsRecordingScrollTop, updateScrollTopHotkey,
+        emojiPanelHotkey, isRecordingEmojiPanel, setIsRecordingEmojiPanel, updateEmojiPanelHotkey,
+        emojiDefaultTab, setEmojiDefaultTab
     } = props;
 
     const [emailCopied, setEmailCopied] = useState(false);
@@ -466,6 +494,8 @@ const SettingsPanel = (props: SettingsPanelProps) => {
                 setEdgeDocking={setEdgeDocking}
                 followMouse={followMouse}
                 setFollowMouse={setFollowMouse}
+                rememberWindowGeometry={rememberWindowGeometry}
+                setRememberWindowGeometry={setRememberWindowGeometry}
                     soundEnabled={soundEnabled}
                     setSoundEnabled={setSoundEnabled}
                     soundVolume={soundVolume}
@@ -547,6 +577,26 @@ const SettingsPanel = (props: SettingsPanelProps) => {
                 appSettings={appSettings}
                 theme={theme}
                 colorMode={colorMode}
+                autoFocusSearch={autoFocusSearch}
+                setAutoFocusSearch={setAutoFocusSearch}
+                textDragSelect={textDragSelect}
+                setTextDragSelect={setTextDragSelect}
+                leftClickMode={leftClickMode}
+                setLeftClickMode={setLeftClickMode}
+                dragSelectPaste={dragSelectPaste}
+                setDragSelectPaste={setDragSelectPaste}
+                quickPasteNavMode={quickPasteNavMode}
+                setQuickPasteNavMode={setQuickPasteNavMode}
+                scrollTopHotkey={scrollTopHotkey}
+                isRecordingScrollTop={isRecordingScrollTop}
+                setIsRecordingScrollTop={setIsRecordingScrollTop}
+                updateScrollTopHotkey={updateScrollTopHotkey}
+                emojiPanelHotkey={emojiPanelHotkey}
+                isRecordingEmojiPanel={isRecordingEmojiPanel}
+                setIsRecordingEmojiPanel={setIsRecordingEmojiPanel}
+                updateEmojiPanelHotkey={updateEmojiPanelHotkey}
+                emojiDefaultTab={emojiDefaultTab}
+                setEmojiDefaultTab={setEmojiDefaultTab}
             />
 
             {/* Appearance Settings */}

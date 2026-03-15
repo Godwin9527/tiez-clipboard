@@ -23,6 +23,8 @@ interface GeneralSettingsGroupProps {
     setEdgeDocking: (val: boolean) => void;
     followMouse: boolean;
     setFollowMouse: (val: boolean) => void;
+    rememberWindowGeometry: boolean;
+    setRememberWindowGeometry: (val: boolean) => void;
     soundEnabled: boolean;
     setSoundEnabled: (val: boolean) => void;
     soundVolume: number;
@@ -57,6 +59,8 @@ const GeneralSettingsGroup = ({
     setEdgeDocking,
     followMouse,
     setFollowMouse,
+    rememberWindowGeometry,
+    setRememberWindowGeometry,
     soundEnabled,
     setSoundEnabled,
     soundVolume,
@@ -154,6 +158,25 @@ const GeneralSettingsGroup = ({
                                 const val = e.target.checked;
                                 setFollowMouse(val);
                                 invoke("set_follow_mouse", { enabled: val }).catch(console.error);
+                            }}
+                        />
+                        <div className="toggle"><div className="left" /><div className="right" /></div>
+                    </label>
+                </div>
+
+                <div className="setting-item">
+                    <div className="item-label-group">
+                        <span className="item-label">{t('remember_window_geometry')}</span>
+                    </div>
+                    <label className="switch">
+                        <input
+                            className="cb"
+                            type="checkbox"
+                            checked={rememberWindowGeometry}
+                            onChange={(e) => {
+                                const val = e.target.checked;
+                                setRememberWindowGeometry(val);
+                                saveAppSetting('remember_window_geometry', String(val));
                             }}
                         />
                         <div className="toggle"><div className="left" /><div className="right" /></div>

@@ -11,11 +11,13 @@ interface UseSettingsPanelPropsOptions {
   language: Locale;
   colorMode: string;
   hotkeyParts: string[];
-  checkHotkeyConflict: (newHotkey: string, mode: "main" | "sequential" | "rich" | "search") => boolean;
+  checkHotkeyConflict: (newHotkey: string, mode: "main" | "sequential" | "rich" | "search" | "scroll_top" | "emoji_panel") => boolean;
   updateHotkey: (key: string) => void;
   updateSequentialHotkey: (key: string) => void;
   updateRichPasteHotkey: (key: string) => void;
   updateSearchHotkey: (key: string) => void;
+  updateScrollTopHotkey: (key: string) => void;
+  updateEmojiPanelHotkey: (key: string) => void;
   saveAppSetting: (key: string, val: string) => void;
   saveSetting: (key: string, val: string) => void;
   saveMqtt: (key: string, val: string) => void;
@@ -38,6 +40,8 @@ export const useSettingsPanelProps = ({
   updateSequentialHotkey,
   updateRichPasteHotkey,
   updateSearchHotkey,
+  updateScrollTopHotkey,
+  updateEmojiPanelHotkey,
   saveAppSetting,
   saveSetting,
   saveMqtt,
@@ -98,6 +102,8 @@ export const useSettingsPanelProps = ({
     setEdgeDocking,
     followMouse,
     setFollowMouse,
+    rememberWindowGeometry,
+    setRememberWindowGeometry,
     customBackground,
     setCustomBackground,
     customBackgroundOpacity,
@@ -213,7 +219,25 @@ export const useSettingsPanelProps = ({
     aiAssignedProfileMouthpiece,
     setAiAssignedProfileMouthpiece,
     aiAssignedProfileTranslate,
-    setAiAssignedProfileTranslate
+    setAiAssignedProfileTranslate,
+    autoFocusSearch,
+    setAutoFocusSearch,
+    textDragSelect,
+    setTextDragSelect,
+    leftClickMode,
+    setLeftClickMode,
+    dragSelectPaste,
+    setDragSelectPaste,
+    quickPasteNavMode,
+    setQuickPasteNavMode,
+    scrollTopHotkey,
+    isRecordingScrollTop,
+    setIsRecordingScrollTop,
+    emojiPanelHotkey,
+    isRecordingEmojiPanel,
+    setIsRecordingEmojiPanel,
+    emojiDefaultTab,
+    setEmojiDefaultTab
   } = state;
 
   return {
@@ -270,6 +294,8 @@ export const useSettingsPanelProps = ({
     setEdgeDocking,
     followMouse,
     setFollowMouse,
+    rememberWindowGeometry,
+    setRememberWindowGeometry,
     customBackground,
     setCustomBackground,
     customBackgroundOpacity,
@@ -399,6 +425,26 @@ export const useSettingsPanelProps = ({
     aiAssignedProfileMouthpiece,
     setAiAssignedProfileMouthpiece,
     aiAssignedProfileTranslate,
-    setAiAssignedProfileTranslate
+    setAiAssignedProfileTranslate,
+    autoFocusSearch,
+    setAutoFocusSearch,
+    textDragSelect,
+    setTextDragSelect,
+    leftClickMode,
+    setLeftClickMode,
+    dragSelectPaste,
+    setDragSelectPaste,
+    quickPasteNavMode,
+    setQuickPasteNavMode,
+    scrollTopHotkey,
+    isRecordingScrollTop,
+    setIsRecordingScrollTop,
+    updateScrollTopHotkey,
+    emojiPanelHotkey,
+    isRecordingEmojiPanel,
+    setIsRecordingEmojiPanel,
+    updateEmojiPanelHotkey,
+    emojiDefaultTab,
+    setEmojiDefaultTab
   };
 };

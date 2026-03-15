@@ -160,7 +160,11 @@ pub async fn copy_to_clipboard(
 async fn handle_window_focus_for_paste(app_handle: &tauri::AppHandle) -> AppResult<()> {
     // 1. Only restore focus if our window actually took focus; avoids unnecessary focus flips
     // that can force fullscreen apps into windowed mode.
-    if crate::IS_MAIN_WINDOW_FOCUSED.load(Ordering::Relaxed) {
+    // In quick-paste mode the window is shown with WS_EX_NOACTIVATE (no focus steal),
+    // so IS_MAIN_WINDOW_FOCUSED stays false — but we still need to ensure the target
+    // window is foreground before pasting. We do that unconditionally here.
+    let last_hwnd_val = crate::LAST_ACTIVE_HWND.load(Ordering::Relaxed);
+    if last_hwnd_val != 0 {
         let _ = restore_focus_before_paste(app_handle).await;
     }
 

@@ -60,7 +60,35 @@ pub fn register_hotkey(app_handle: AppHandle, hotkey: String) -> AppResult<()> {
             let _ = app_handle.global_shortcut().register(shortcut);
         }
     }
-    
+
+    // scroll-to-top hotkey: handled via low-level keyboard hook (not global shortcut)
+    // so that other apps can still use the same key combo when clipboard window is hidden
+    {
+        let scroll_top_hotkey = {
+            let settings = app_handle.state::<SettingsState>();
+            let val = settings.scroll_top_hotkey.lock().unwrap().clone();
+            val
+        };
+        let parsed = if scroll_top_hotkey.is_empty() {
+            None
+        } else {
+            crate::app::hooks::parse_hotkey_for_hook(&scroll_top_hotkey)
+        };
+        *crate::global_state::SCROLL_TOP_HOTKEY.lock().unwrap() = parsed;
+    }
+
+    // emoji panel hotkey
+    let emoji_panel_hotkey = {
+        let settings = app_handle.state::<SettingsState>();
+        let val = settings.emoji_panel_hotkey.lock().unwrap().clone();
+        val
+    };
+    if !emoji_panel_hotkey.is_empty() {
+        if let Ok(shortcut) = emoji_panel_hotkey.replace("Win", "Super").parse::<Shortcut>() {
+            let _ = app_handle.global_shortcut().register(shortcut);
+        }
+    }
+
     Ok(())
 }
 

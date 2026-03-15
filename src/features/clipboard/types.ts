@@ -18,6 +18,9 @@ export interface ClipboardItemProps {
   tagColors?: Record<string, string>;
   aiOptionsOpen?: boolean;
   richTextSnapshotPreview?: boolean;
+  textDragSelect?: boolean;
+  leftClickMode?: string;
+  dragSelectPaste?: boolean;
 
   onSelect: () => void;
   onCopy: (withFormat?: boolean) => void;

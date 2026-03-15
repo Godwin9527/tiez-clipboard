@@ -610,6 +610,9 @@ const ClipboardItem = ({
     onAIOptionsToggle,
     tagColors,
     richTextSnapshotPreview = false,
+    textDragSelect = false,
+    leftClickMode = "off",
+    dragSelectPaste = false,
     dragControls,
     id,
     compactMode,
@@ -626,6 +629,11 @@ const ClipboardItem = ({
     const richSnapshotFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const hoverAnchorRef = useRef<CompactPreviewAnchor | null>(null);
+    const [dragSelectActive, setDragSelectActive] = useState(false);
+    const dragSelectActiveRef = useRef(false);
+    const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const dragSelectRef = useRef<HTMLDivElement | null>(null);
+    const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
     const richTextFallback = item.content_type === "rich_text" && item.html_content
         ? (() => {
             const { cleanHtml, imagePayload } = extractRichImageFallback(item.html_content);
@@ -941,7 +949,21 @@ const ClipboardItem = ({
                 if (target.closest('a')) {
                     e.preventDefault();
                 }
+                if (leftClickMode !== "off") return;
                 onCopy(false); // Plain text by default for click
+                onSelect();
+            }}
+            onDoubleClick={(e) => {
+                if (leftClickMode !== "double_click_paste") return;
+                const target = e.target as HTMLElement;
+                if (target.closest('button') || target.closest('input') || target.closest('textarea')) {
+                    return;
+                }
+                void hideCompactPreviewGlobal();
+                if (target.closest('a')) {
+                    e.preventDefault();
+                }
+                onCopy(false);
                 onSelect();
             }}
             onContextMenu={(e) => {
@@ -955,8 +977,15 @@ const ClipboardItem = ({
                 if (target.closest('a')) {
                     e.stopPropagation();
                 }
-                onCopy(true); // Formatted text for right-click
-                onSelect();
+                if (leftClickMode === "double_click_paste") {
+                    onOpen(e);
+                } else if (leftClickMode === "right_click_paste") {
+                    onCopy(false); // Plain text when left-click is disabled
+                    onSelect();
+                } else {
+                    onCopy(true); // Formatted paste for default mode
+                    onSelect();
+                }
             }}
             onMouseEnter={(e) => {
                 if (!compactMode) return;
@@ -1257,7 +1286,92 @@ const ClipboardItem = ({
                                 </span>
                             </div>
                         )
-                        : item.preview
+                        : textDragSelect && item.content_type === "text" ? (
+                            <div
+                                ref={dragSelectRef}
+                                style={{
+                                    userSelect: dragSelectActive ? 'text' : 'none',
+                                    WebkitUserSelect: dragSelectActive ? 'text' : 'none',
+                                    cursor: dragSelectActive ? 'text' : 'default',
+                                    pointerEvents: 'auto'
+                                }}
+                                onMouseDown={(e) => {
+                                    if (e.button !== 0) return;
+                                    dragStartPosRef.current = { x: e.clientX, y: e.clientY };
+                                    longPressTimerRef.current = setTimeout(() => {
+                                        // Synchronously enable text selection on the DOM element
+                                        if (dragSelectRef.current) {
+                                            dragSelectRef.current.style.userSelect = 'text';
+                                            dragSelectRef.current.style.webkitUserSelect = 'text';
+                                            dragSelectRef.current.style.cursor = 'text';
+                                        }
+                                        dragSelectActiveRef.current = true;
+                                        setDragSelectActive(true);
+                                        // Place initial caret at long-press position
+                                        if (dragStartPosRef.current) {
+                                            const range = document.caretRangeFromPoint(
+                                                dragStartPosRef.current.x,
+                                                dragStartPosRef.current.y
+                                            );
+                                            if (range) {
+                                                const sel = window.getSelection();
+                                                sel?.removeAllRanges();
+                                                sel?.addRange(range);
+                                            }
+                                        }
+                                    }, leftClickMode !== "off" ? 0 : 400);
+                                }}
+                                onMouseMove={(e) => {
+                                    if (!dragSelectActiveRef.current) return;
+                                    const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+                                    if (range) {
+                                        const sel = window.getSelection();
+                                        if (sel && sel.rangeCount > 0) {
+                                            sel.extend(range.startContainer, range.startOffset);
+                                        }
+                                    }
+                                }}
+                                onMouseUp={() => {
+                                    if (longPressTimerRef.current) {
+                                        clearTimeout(longPressTimerRef.current);
+                                        longPressTimerRef.current = null;
+                                    }
+                                    if (dragSelectActiveRef.current) {
+                                        const sel = window.getSelection();
+                                        const selectedText = sel?.toString();
+                                        if (selectedText && selectedText.length > 0) {
+                                            if (dragSelectPaste) {
+                                                invoke("copy_to_clipboard", {
+                                                    content: selectedText,
+                                                    contentType: "text",
+                                                    paste: true,
+                                                    id: 0,
+                                                    deleteAfterUse: false,
+                                                    pasteWithFormat: false,
+                                                    moveToTop: false
+                                                }).catch(console.error);
+                                            } else {
+                                                navigator.clipboard.writeText(selectedText).catch(console.error);
+                                            }
+                                        }
+                                        setTimeout(() => {
+                                            sel?.removeAllRanges();
+                                            dragSelectActiveRef.current = false;
+                                            setDragSelectActive(false);
+                                        }, 100);
+                                    }
+                                    dragStartPosRef.current = null;
+                                }}
+                                onMouseLeave={() => {
+                                    if (longPressTimerRef.current) {
+                                        clearTimeout(longPressTimerRef.current);
+                                        longPressTimerRef.current = null;
+                                    }
+                                }}
+                            >
+                                {item.preview}
+                            </div>
+                        ) : item.preview
                 )}
             </div>
 
@@ -1460,7 +1574,10 @@ export default memo(ClipboardItem, (prevProps, nextProps) => {
         prevProps.compactMode === nextProps.compactMode &&
         prevProps.theme === nextProps.theme &&
         prevProps.language === nextProps.language &&
-        prevProps.tagInput === nextProps.tagInput;
+        prevProps.tagInput === nextProps.tagInput &&
+        prevProps.textDragSelect === nextProps.textDragSelect &&
+        prevProps.leftClickMode === nextProps.leftClickMode &&
+        prevProps.dragSelectPaste === nextProps.dragSelectPaste;
 });
 
 

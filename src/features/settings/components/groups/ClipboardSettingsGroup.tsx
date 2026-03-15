@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { ComponentType, ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ask, message } from "@tauri-apps/plugin-dialog";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, X } from "lucide-react";
 
 interface LabelWithHintProps {
     label: string;
@@ -50,7 +50,7 @@ interface ClipboardSettingsGroupProps {
     isRecordingSequential: boolean;
     setIsRecordingSequential: (val: boolean) => void;
     updateSequentialHotkey: (key: string) => void;
-    checkHotkeyConflict: (newHotkey: string, mode: 'main' | 'sequential' | 'rich' | 'search') => boolean;
+    checkHotkeyConflict: (newHotkey: string, mode: 'main' | 'sequential' | 'rich' | 'search' | 'scroll_top' | 'emoji_panel') => boolean;
     privacyProtection: boolean;
     setPrivacyProtection: (val: boolean) => void;
     privacyProtectionKinds: string[];
@@ -71,11 +71,33 @@ interface ClipboardSettingsGroupProps {
     appSettings: Record<string, string>;
     theme: string;
     colorMode: string;
+    autoFocusSearch: boolean;
+    setAutoFocusSearch: (val: boolean) => void;
+    textDragSelect: boolean;
+    setTextDragSelect: (val: boolean) => void;
+    leftClickMode: string;
+    setLeftClickMode: (val: string) => void;
+    dragSelectPaste: boolean;
+    setDragSelectPaste: (val: boolean) => void;
+    quickPasteNavMode: string;
+    setQuickPasteNavMode: (val: string) => void;
+    scrollTopHotkey: string;
+    isRecordingScrollTop: boolean;
+    setIsRecordingScrollTop: (val: boolean) => void;
+    updateScrollTopHotkey: (key: string) => void;
+    emojiPanelHotkey: string;
+    isRecordingEmojiPanel: boolean;
+    setIsRecordingEmojiPanel: (val: boolean) => void;
+    updateEmojiPanelHotkey: (key: string) => void;
+    emojiDefaultTab: "emoji" | "favorites";
+    setEmojiDefaultTab: (val: "emoji" | "favorites") => void;
 }
 
 const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
     const sequentialHotkeyParts = props.sequentialHotkey ? props.sequentialHotkey.split('+') : [];
     const searchHotkeyParts = props.searchHotkey ? props.searchHotkey.split('+') : [];
+    const scrollTopHotkeyParts = props.scrollTopHotkey ? props.scrollTopHotkey.split('+') : [];
+    const emojiPanelHotkeyParts = props.emojiPanelHotkey ? props.emojiPanelHotkey.split('+') : [];
     const [persistentLimitDraft, setPersistentLimitDraft] = useState(
         props.persistentLimit.toString()
     );
@@ -314,6 +336,16 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                 <div className="key-cap" style={{ opacity: 0.5 }}>{props.t('not_set')}</div>
                             )}
                         </div>
+                        {!props.isRecordingRich && props.richPasteHotkey && (
+                            <button
+                                className="btn-icon"
+                                style={{ marginTop: '4px', marginLeft: '4px', opacity: 0.5 }}
+                                title={props.t('clear_hotkey')}
+                                onClick={(e) => { e.stopPropagation(); props.updateRichPasteHotkey(''); }}
+                            >
+                                <X size={12} />
+                            </button>
+                        )}
                     </div>
                     <div className="setting-item">
                         <div className="item-label-group">
@@ -369,6 +401,268 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                 )
                             )}
                         </div>
+                        {!props.isRecordingSearch && props.searchHotkey && (
+                            <button
+                                className="btn-icon"
+                                style={{ marginTop: '4px', marginLeft: '4px', opacity: 0.5 }}
+                                title={props.t('clear_hotkey')}
+                                onClick={(e) => { e.stopPropagation(); props.updateSearchHotkey(''); }}
+                            >
+                                <X size={12} />
+                            </button>
+                        )}
+                    </div>
+                    <div className="setting-item">
+                        <props.LabelWithHint
+                            label={props.t('auto_focus_search')}
+                            hint={props.t('auto_focus_search_hint')}
+                            hintKey="auto_focus_search"
+                        />
+                        <label className="switch">
+                            <input
+                                className="cb"
+                                type="checkbox"
+                                checked={props.autoFocusSearch}
+                                onChange={(e) => {
+                                    const val = e.target.checked;
+                                    props.setAutoFocusSearch(val);
+                                    props.saveAppSetting('auto_focus_search', String(val));
+                                }}
+                            />
+                            <div className="toggle"><div className="left" /><div className="right" /></div>
+                        </label>
+                    </div>
+                    <div className="setting-item">
+                        <props.LabelWithHint
+                            label={props.t('text_drag_select')}
+                            hint={props.t('text_drag_select_hint')}
+                            hintKey="text_drag_select"
+                        />
+                        <label className="switch">
+                            <input
+                                className="cb"
+                                type="checkbox"
+                                checked={props.textDragSelect}
+                                onChange={(e) => {
+                                    const val = e.target.checked;
+                                    props.setTextDragSelect(val);
+                                    props.saveAppSetting('text_drag_select', String(val));
+                                }}
+                            />
+                            <div className="toggle"><div className="left" /><div className="right" /></div>
+                        </label>
+                    </div>
+                    <div className="setting-item">
+                        <props.LabelWithHint
+                            label={props.t('left_click_noop')}
+                            hint={props.leftClickMode === 'double_click_paste' ? props.t('left_click_mode_double_click_paste_hint') : props.leftClickMode === 'right_click_paste' ? props.t('left_click_mode_right_click_paste_hint') : props.t('left_click_noop_hint')}
+                            hintKey="left_click_noop"
+                        />
+                        <select
+                            className="select-control"
+                            value={props.leftClickMode}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                props.setLeftClickMode(val);
+                                props.saveAppSetting('left_click_noop', val);
+                            }}
+                        >
+                            <option value="off">{props.t('left_click_mode_off')}</option>
+                            <option value="right_click_paste">{props.t('left_click_mode_right_click_paste')}</option>
+                            <option value="double_click_paste">{props.t('left_click_mode_double_click_paste')}</option>
+                        </select>
+                    </div>
+                    <div className="setting-item">
+                        <props.LabelWithHint
+                            label={props.t('drag_select_paste')}
+                            hint={props.t('drag_select_paste_hint')}
+                            hintKey="drag_select_paste"
+                        />
+                        <label className="switch">
+                            <input
+                                className="cb"
+                                type="checkbox"
+                                checked={props.dragSelectPaste}
+                                onChange={(e) => {
+                                    const val = e.target.checked;
+                                    props.setDragSelectPaste(val);
+                                    props.saveAppSetting('drag_select_paste', String(val));
+                                }}
+                            />
+                            <div className="toggle"><div className="left" /><div className="right" /></div>
+                        </label>
+                    </div>
+                    <div className="setting-item">
+                        <div className="item-label-group">
+                            <span className="item-label">{props.t('quick_paste_hotkey_label')}</span>
+                            <span className="hint">
+                                {props.t('quick_paste_hotkey_hint')}
+                            </span>
+                        </div>
+                        <select
+                            className="select-control"
+                            value={props.quickPasteNavMode}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                props.setQuickPasteNavMode(val);
+                                invoke("set_quick_paste_nav_mode", { mode: val }).catch(console.error);
+                            }}
+                            style={{ minWidth: '100px' }}
+                        >
+                            <option value="off">{props.t('quick_paste_nav_off')}</option>
+                            <option value="wheel">{props.t('quick_paste_nav_wheel')}</option>
+                            <option value="arrow">{props.t('quick_paste_nav_arrow')}</option>
+                            <option value="both">{props.t('quick_paste_nav_both')}</option>
+                        </select>
+                    </div>
+                    <div className="setting-item">
+                        <div className="item-label-group">
+                            <span className="item-label">{props.t('scroll_top_hotkey_label')}</span>
+                            <span className="hint">
+                                {props.isRecordingScrollTop ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                        <span style={{ color: '#ff9800', fontWeight: 'bold' }}>
+                                            {props.t('win_key_not_recommended')}
+                                        </span>
+                                        <span style={{ fontSize: '11px', opacity: 0.8 }}>
+                                            {props.t('hotkey_recording_esc')}
+                                        </span>
+                                    </div>
+                                ) : props.t('hotkey_click_hint')}
+                            </span>
+                        </div>
+                        <div
+                            className={`key-group ${props.isRecordingScrollTop ? 'recording' : ''}`}
+                            onClick={() => props.setIsRecordingScrollTop(true)}
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                                if (!props.isRecordingScrollTop) return;
+                                e.preventDefault();
+                                e.stopPropagation();
+
+                                if (e.key === 'Escape') {
+                                    props.setIsRecordingScrollTop(false);
+                                    return;
+                                }
+
+                                const modifiers = [];
+                                if (e.ctrlKey) modifiers.push('Ctrl');
+                                if (e.shiftKey) modifiers.push('Shift');
+                                if (e.altKey) modifiers.push('Alt');
+
+                                const key = e.key.toUpperCase();
+                                if (['CONTROL', 'SHIFT', 'ALT', 'META'].includes(key)) return;
+
+                                const newHotkey = [...modifiers, key].join('+');
+                                props.updateScrollTopHotkey(newHotkey);
+                            }}
+                        >
+                            {props.isRecordingScrollTop ? (
+                                <div className="key-cap" style={{ width: '8em' }}>{props.t('waiting_for_input')}</div>
+                            ) : (
+                                scrollTopHotkeyParts.length > 0 ? (
+                                    scrollTopHotkeyParts.map((k, i) => (
+                                        <div key={i} className="key-cap">{k}</div>
+                                    ))
+                                ) : (
+                                    <div className="key-cap" style={{ width: '8em', opacity: 0.5 }}>{props.t('not_set')}</div>
+                                )
+                            )}
+                        </div>
+                        {!props.isRecordingScrollTop && props.scrollTopHotkey && (
+                            <button
+                                className="btn-icon"
+                                style={{ marginTop: '4px', marginLeft: '4px', opacity: 0.5 }}
+                                title={props.t('clear_hotkey')}
+                                onClick={(e) => { e.stopPropagation(); props.updateScrollTopHotkey(''); }}
+                            >
+                                <X size={12} />
+                            </button>
+                        )}
+                    </div>
+                    <div className="setting-item">
+                        <div className="item-label-group">
+                            <span className="item-label">{props.t('emoji_panel_hotkey_label')}</span>
+                            <span className="hint">
+                                {props.isRecordingEmojiPanel ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                        <span style={{ color: '#ff9800', fontWeight: 'bold' }}>
+                                            {props.t('win_key_not_recommended')}
+                                        </span>
+                                        <span style={{ fontSize: '11px', opacity: 0.8 }}>
+                                            {props.t('hotkey_recording_esc')}
+                                        </span>
+                                    </div>
+                                ) : props.t('hotkey_click_hint')}
+                            </span>
+                        </div>
+                        <div
+                            className={`key-group ${props.isRecordingEmojiPanel ? 'recording' : ''}`}
+                            onClick={() => props.setIsRecordingEmojiPanel(true)}
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                                if (!props.isRecordingEmojiPanel) return;
+                                e.preventDefault();
+                                e.stopPropagation();
+
+                                if (e.key === 'Escape') {
+                                    props.setIsRecordingEmojiPanel(false);
+                                    return;
+                                }
+
+                                const modifiers = [];
+                                if (e.ctrlKey) modifiers.push('Ctrl');
+                                if (e.shiftKey) modifiers.push('Shift');
+                                if (e.altKey) modifiers.push('Alt');
+
+                                const key = e.key.toUpperCase();
+                                if (['CONTROL', 'SHIFT', 'ALT', 'META'].includes(key)) return;
+
+                                const newHotkey = [...modifiers, key].join('+');
+                                props.updateEmojiPanelHotkey(newHotkey);
+                            }}
+                        >
+                            {props.isRecordingEmojiPanel ? (
+                                <div className="key-cap" style={{ width: '8em' }}>{props.t('waiting_for_input')}</div>
+                            ) : (
+                                emojiPanelHotkeyParts.length > 0 ? (
+                                    emojiPanelHotkeyParts.map((k, i) => (
+                                        <div key={i} className="key-cap">{k}</div>
+                                    ))
+                                ) : (
+                                    <div className="key-cap" style={{ width: '8em', opacity: 0.5 }}>{props.t('not_set')}</div>
+                                )
+                            )}
+                        </div>
+                        {!props.isRecordingEmojiPanel && props.emojiPanelHotkey && (
+                            <button
+                                className="btn-icon"
+                                style={{ marginTop: '4px', marginLeft: '4px', opacity: 0.5 }}
+                                title={props.t('clear_hotkey')}
+                                onClick={(e) => { e.stopPropagation(); props.updateEmojiPanelHotkey(''); }}
+                            >
+                                <X size={12} />
+                            </button>
+                        )}
+                    </div>
+                    <div className="setting-item">
+                        <div className="item-label-group">
+                            <span className="item-label">{props.t('emoji_default_tab')}</span>
+                            <span className="hint">{props.t('emoji_default_tab_hint')}</span>
+                        </div>
+                        <select
+                            className="select-control"
+                            value={props.emojiDefaultTab}
+                            onChange={(e) => {
+                                const val = e.target.value as "emoji" | "favorites";
+                                props.setEmojiDefaultTab(val);
+                                invoke("save_setting", { key: "app.emoji_default_tab", value: val }).catch(console.error);
+                            }}
+                            style={{ minWidth: '100px' }}
+                        >
+                            <option value="emoji">Emoji</option>
+                            <option value="favorites">{props.t('emoji_favorites') || 'Favorites'}</option>
+                        </select>
                     </div>
                     <div className="setting-item">
                         <div className="item-label-group">
@@ -539,6 +833,16 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                     )
                                 )}
                             </div>
+                            {!props.isRecordingSequential && props.sequentialHotkey && (
+                                <button
+                                    className="btn-icon"
+                                    style={{ marginTop: '4px', marginLeft: '4px', opacity: 0.5 }}
+                                    title={props.t('clear_hotkey')}
+                                    onClick={(e) => { e.stopPropagation(); props.updateSequentialHotkey(''); }}
+                                >
+                                    <X size={12} />
+                                </button>
+                            )}
                         </div>
                     )}
 
@@ -701,6 +1005,16 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                     )
                                 )}
                             </div>
+                            {!props.isRecording && props.hotkey && (
+                                <button
+                                    className="btn-icon"
+                                    style={{ marginTop: '4px', marginLeft: '4px', opacity: 0.5 }}
+                                    title={props.t('clear_hotkey')}
+                                    onClick={(e) => { e.stopPropagation(); props.updateHotkey(''); }}
+                                >
+                                    <X size={12} />
+                                </button>
+                            )}
                         </div>
                     )}
 

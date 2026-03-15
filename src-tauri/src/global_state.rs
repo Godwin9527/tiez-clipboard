@@ -1,6 +1,6 @@
 // Global state module
 use std::ptr::null_mut;
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, AtomicPtr, AtomicI32};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, AtomicU64, AtomicUsize, AtomicPtr, AtomicI32};
 
 pub static GLOBAL_APP_HANDLE: std::sync::OnceLock<tauri::AppHandle> = std::sync::OnceLock::new();
 pub static HOOK_HANDLE: AtomicPtr<std::ffi::c_void> = AtomicPtr::new(null_mut());
@@ -17,6 +17,7 @@ pub struct HookHotkey {
 }
 
 pub static TARGET_HOTKEY: std::sync::Mutex<Option<HookHotkey>> = std::sync::Mutex::new(None);
+pub static SCROLL_TOP_HOTKEY: std::sync::Mutex<Option<HookHotkey>> = std::sync::Mutex::new(None);
 
 // Win+ hotkeys are now handled via tauri-plugin-global-shortcut.
 
@@ -48,3 +49,7 @@ pub static IS_MOUSE_BUTTON_DOWN: AtomicBool = AtomicBool::new(false);
 pub static NAVIGATION_ENABLED: AtomicBool = AtomicBool::new(false);
 pub static NAVIGATION_MODE_ACTIVE: AtomicBool = AtomicBool::new(false);
 pub static IS_MAIN_WINDOW_FOCUSED: AtomicBool = AtomicBool::new(false);
+pub static QUICK_PASTE_MODE: AtomicBool = AtomicBool::new(false);
+// Quick paste nav mode: 0=off, 1=wheel, 2=arrow, 3=both
+pub static QUICK_PASTE_NAV_MODE: AtomicU8 = AtomicU8::new(0);
+pub static RESTORING_GEOMETRY: AtomicBool = AtomicBool::new(false);

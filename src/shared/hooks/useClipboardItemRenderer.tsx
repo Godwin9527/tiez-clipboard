@@ -19,6 +19,9 @@ interface UseClipboardItemRendererOptions {
   t: (key: string) => string;
   compactMode: boolean;
   richTextSnapshotPreview: boolean;
+  textDragSelect: boolean;
+  leftClickMode: string;
+  dragSelectPaste: boolean;
   processingAiId: number | null;
   aiEnabled: boolean;
   aiOptionsOpenId: number | null;
@@ -61,6 +64,9 @@ export const useClipboardItemRenderer = ({
   t,
   compactMode,
   richTextSnapshotPreview,
+  textDragSelect,
+  leftClickMode,
+  dragSelectPaste,
   processingAiId,
   aiEnabled,
   aiOptionsOpenId,
@@ -103,6 +109,9 @@ export const useClipboardItemRenderer = ({
           t={t}
           compactMode={compactMode}
           richTextSnapshotPreview={richTextSnapshotPreview}
+          textDragSelect={textDragSelect}
+          leftClickMode={leftClickMode}
+          dragSelectPaste={dragSelectPaste}
           onSelect={() => setSelectedIndex(index)}
           onCopy={(withFormat) =>
             copyToClipboard(item.id, item.content, item.content_type, withFormat)
@@ -176,6 +185,9 @@ export const useClipboardItemRenderer = ({
       t,
       compactMode,
       richTextSnapshotPreview,
+      textDragSelect,
+      leftClickMode,
+      dragSelectPaste,
       processingAiId,
       aiEnabled,
       aiOptionsOpenId,
