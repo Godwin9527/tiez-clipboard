@@ -20,19 +20,8 @@ export const getTagColor = (tag: string, theme: string) => {
   }
 };
 
-export const getConciseTime = (timestamp: number, language: Locale) => {
-  const diff = Date.now() - timestamp;
-  const seconds = Math.floor(diff / 1000);
-
-  if (language === "zh") {
-    if (seconds < 60) return "< 1分钟";
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}分钟前`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}小时前`;
-    return `${Math.floor(seconds / 86400)}天前`;
-  } else {
-    if (seconds < 60) return "< 1m";
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-    return `${Math.floor(seconds / 86400)}d ago`;
-  }
+export const getConciseTime = (timestamp: number, _language: Locale) => {
+  const d = new Date(timestamp);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 };

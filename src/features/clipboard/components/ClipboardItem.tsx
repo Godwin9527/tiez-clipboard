@@ -671,6 +671,19 @@ const ClipboardItem = ({
         : effectiveRichTextSnapshotSrc;
     const useSnapshotPreviewImage = snapshotPreviewEnabled && !useRichImageFallback && !!effectiveRichTextSnapshotSrc;
 
+    const MAX_PREVIEW_LINES = 12;
+    const textContentLines = useMemo(() => {
+        if (item.content_type !== 'text' && item.content_type !== 'rich_text') return { lines: [], total: 0, remaining: 0 };
+        const allLines = item.content.split('\n');
+        const total = allLines.length;
+        const remaining = Math.max(0, total - MAX_PREVIEW_LINES);
+        return { lines: allLines.slice(0, MAX_PREVIEW_LINES), total, remaining };
+    }, [item.content, item.content_type]);
+    const previewText = textContentLines.remaining > 0
+        ? textContentLines.lines.join('\n')
+        : item.preview;
+    const maxPreviewHeight = compactMode ? undefined : '200px';
+
     const hideCompactPreview = async () => {
         await hideCompactPreviewGlobal();
     };
@@ -1110,7 +1123,8 @@ const ClipboardItem = ({
                             <X size={12} />
                         </button>
                     </div>
-                    <div className="app-info" style={{ opacity: 0.6, fontSize: '10px', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <div className="app-info" style={{ opacity: 0.6, fontSize: '10px', display: 'flex', gap: '6px', alignItems: 'center', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                        {item.content_type === 'text' && <span style={{ color: 'var(--accent-color)', opacity: 0.8 }}>{item.content.length}字</span>}
                         <span>{getConciseTime(item.timestamp, language)}</span>
                     </div>
                 </div>
@@ -1121,7 +1135,7 @@ const ClipboardItem = ({
                     <Pin size={10} fill="currentColor" />
                 </div>
             )}
-            <div className={`content-preview ${item.content_type === 'rich_text' ? 'rich-text' : ''} ${isSensitiveHidden ? 'sensitive-blur' : ''}`}>
+            <div className={`content-preview ${item.content_type === 'rich_text' ? 'rich-text' : ''} ${isSensitiveHidden ? 'sensitive-blur' : ''}`} style={maxPreviewHeight ? { maxHeight: maxPreviewHeight } : undefined}>
                 {item.content_type === "image" ? (
                     <div style={{ position: 'relative' }}>
                         {item.is_external && item.file_preview_exists === false ? (
@@ -1369,11 +1383,16 @@ const ClipboardItem = ({
                                     }
                                 }}
                             >
-                                {item.preview}
+                                {previewText}
                             </div>
-                        ) : item.preview
+                        ) : previewText
                 )}
             </div>
+            {!compactMode && textContentLines.remaining > 0 && !isSensitiveHidden && (item.content_type === 'text' || item.content_type === 'rich_text') && (
+                <div style={{ fontSize: '10px', color: 'var(--text-secondary)', opacity: 0.7, textAlign: 'right', marginTop: '2px', fontFamily: 'var(--font-mono)' }}>
+                    {language === 'zh' ? `还有 ${textContentLines.remaining} 行` : `${textContentLines.remaining} more lines`}
+                </div>
+            )}
 
             {/* AI Options - Compact Mode: Dropdown Panel, Normal Mode: Inline */}
             <AnimatePresence>
